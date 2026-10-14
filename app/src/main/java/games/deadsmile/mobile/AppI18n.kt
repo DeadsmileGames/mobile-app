@@ -555,8 +555,12 @@ object AppI18n {
     )
 
     fun translate(context: Context, value: String): String {
-        val language = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
+        val saved = runCatching {
+            context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE).getString("app_language", "").orEmpty()
+        }.getOrDefault("")
+        val systemLanguage = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
             ?: Locale.getDefault().language
+        val language = saved.ifBlank { systemLanguage }
         return translate(language, value)
     }
 
