@@ -21,7 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -469,10 +469,16 @@ private fun DeadsmileRoot(
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { pad ->
-        val duration = if (reduceMotion) 0 else 220
-        Crossfade(
+        AnimatedContent(
             targetState = page,
-            animationSpec = tween(durationMillis = duration),
+            transitionSpec = {
+                if (reduceMotion) {
+                    fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                } else {
+                    (fadeIn(tween(180)) + slideInVertically(tween(220)) { height -> height / 28 }) togetherWith
+                        (fadeOut(tween(140)) + slideOutVertically(tween(160)) { height -> -height / 40 })
+                }
+            },
             label = "deadsmile-page"
         ) { targetPage ->
             when (targetPage) {
@@ -1455,10 +1461,12 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 
     val images = remember(state.games) {
         val abby = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) }
-        (abby?.screenshots.orEmpty() + listOfNotNull(abby?.image) + ABBY_OFFICIAL_ARTWORK).distinct().take(13)
+        (abby?.screenshots.orEmpty().take(10) + listOfNotNull(abby?.image) + ABBY_OFFICIAL_ARTWORK).distinct()
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
-    LaunchedEffect(images) {
+    var imageFallbackLocked by remember(images) { mutableStateOf(false) }
+    LaunchedEffect(images, imageFallbackLocked) {
+        if (imageFallbackLocked) return@LaunchedEffect
         while (images.isNotEmpty()) {
             delay(3000)
             imageIndex = (imageIndex + 1) % images.size
@@ -1478,8 +1486,17 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 ) {
-                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
-                    else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    if (painter.state is AsyncImagePainter.State.Success) {
+                        SubcomposeAsyncImageContent()
+                    } else if (painter.state is AsyncImagePainter.State.Error && index < images.lastIndex) {
+                        LaunchedEffect(index, images) {
+                            imageFallbackLocked = true
+                            imageIndex = images.lastIndex
+                        }
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    } else {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    }
                 }
             }
         }
@@ -1606,7 +1623,7 @@ private fun decodeProfileImage(value: String?): Bitmap? {
 private fun decodeProfileBitmap(context: Context, uri: Uri, maxDimension: Int): Bitmap? {
     val resolver = context.contentResolver
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        return runCatching {
+        val modern = runCatching {
             val source = ImageDecoder.createSource(resolver, uri)
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
@@ -1614,6 +1631,8 @@ private fun decodeProfileBitmap(context: Context, uri: Uri, maxDimension: Int): 
                 decoder.setTargetSampleSize((longest / maxDimension).coerceAtLeast(1))
             }
         }.getOrNull()
+        if (modern != null) return modern
+        // Fall back to BitmapFactory for unusual files not supported by this device's ImageDecoder.
     }
 
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
