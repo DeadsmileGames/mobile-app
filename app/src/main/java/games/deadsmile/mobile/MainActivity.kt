@@ -491,15 +491,17 @@ private fun DeadsmileRoot(
                     remove = vm::removeWishlist
                 )
                 Page.SETTINGS -> SettingsScreen(
+                    pad = pad,
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
                     reduceMotion = reduceMotion, onReduceMotion = onReduceMotion,
                     appLanguage = appLanguage, onAppLanguage = onAppLanguage,
                     onOpenUpdates = { returnPage = Page.SETTINGS; page = Page.UPDATES }
                 )
-                Page.NOTIFICATIONS -> NotificationsScreen()
+                Page.NOTIFICATIONS -> NotificationsScreen(pad)
                 Page.VIDEO_PLAYER -> videoItem?.let { VideoPlayerScreen(it, pad) } ?: run { page = Page.VIDEOS }
                 Page.UPDATES -> UpdatesScreen(
+                    pad = pad,
                     releases = releases,
                     loading = releasesLoading,
                     error = releaseError,
@@ -1610,6 +1612,7 @@ private fun encodeProfileImage(context: Context, uri: Uri): String? {
 
 @Composable
 private fun SettingsScreen(
+    pad: PaddingValues,
     themeMode: Int,
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
@@ -1621,7 +1624,7 @@ private fun SettingsScreen(
     onOpenUpdates: () -> Unit
 ) {
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().padding(pad),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -1939,10 +1942,10 @@ private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: Pa
 }
 
 @Composable
-private fun NotificationsScreen() {
+private fun NotificationsScreen(pad: PaddingValues) {
     val context = LocalContext.current
     var notifications by remember { mutableStateOf(games.deadsmile.mobile.data.LocalNotificationStore.load(context)) }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Notificações", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
