@@ -302,8 +302,14 @@ fun JSONObject.feed(vararg keys: String): List<FeedItem> {
     }
 }
 
-fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
-    val detail = optJSONObject("game") ?: optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
+fun JSONObject.detailItem(fallback: FeedItem, preferGame: Boolean? = null): FeedItem {
+    // The response may include a related "game" next to an "article". Prefer the entity
+    // implied by the requested endpoint, rather than treating the related game as the article.
+    val detail = when (preferGame) {
+        true -> optJSONObject("game") ?: optJSONObject("item") ?: this
+        false -> optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
+        null -> optJSONObject("game") ?: optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
+    }
     val parsed = itemFromJson(detail, fallback.id, true)
     val rootRelated = if (detail !== this) itemFromJson(this, fallback.id, true).relatedGames else emptyList()
     return parsed.copy(
