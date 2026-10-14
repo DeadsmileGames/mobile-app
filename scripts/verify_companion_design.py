@@ -66,6 +66,48 @@ def is_balanced(source: str) -> bool:
     # is a simple regression guard, not a Kotlin parser.
     return source.count("{") == source.count("}")
 
+def translation_keys(map_name: str) -> set[str]:
+    start = I18N.index("private val " + map_name + " = mapOf(")
+    end = I18N.index("\n    )", start)
+    block = I18N[start:end]
+    return set(re.findall(r'"([^"]+)"\s+to\s+"', block))
+
+LOCALIZED_UI_KEYS = (
+    "Buscar em todo o app",
+    "Buscar jogos, notícias e vídeos",
+    "Resultados da busca",
+    "Nenhum resultado encontrado.",
+    "Pesquise pelo nome do jogo, notícia ou vídeo.",
+    "Classificação indicativa",
+    "Classificação não informada",
+    "Reproduzir vídeo",
+    "Explorar catálogo",
+    "Navegação",
+    "English",
+    "O idioma precisa ser escolhido para continuar.",
+    "Não foi possível carregar o conteúdo completo agora. Tente novamente.",
+    "Enviamos um link de confirmação. Seu e-mail atual continua ativo até a confirmação.",
+    "Preferências de privacidade salvas.",
+    "Não foi possível iniciar a verificação em duas etapas.",
+    "Verificação em duas etapas desativada.",
+    "Verificação em duas etapas ativada.",
+    "Não foi possível identificar este jogo para sua lista de desejos.",
+    "Jogo adicionado à lista de desejos.",
+    "Digite o código de autenticação em duas etapas.",
+    "Autenticação concluída.",
+    "Conta criada. Confira seu e-mail para concluir a verificação.",
+    "Você saiu da conta.",
+    "Não foi possível conectar. Confira sua internet e tente novamente.",
+    "E-mail ou senha não conferem.",
+    "Não foi possível autorizar esta ação. Confira sua conta e tente novamente.",
+    "Este recurso não está disponível no momento.",
+    "Esses dados já estão em uso. Confira as informações.",
+    "Algumas informações precisam ser corrigidas.",
+    "Muitas tentativas em sequência. Aguarde um pouco e tente novamente.",
+    "O serviço está indisponível agora. Tente novamente mais tarde.",
+    "Não foi possível concluir agora. Tente novamente.",
+)
+
 # 25 shared contracts repeated against each screen's dependencies. This makes
 # the same language/navigation/runtime assumptions mandatory for every UI area.
 GLOBAL_CHECKS = [
@@ -90,8 +132,8 @@ GLOBAL_CHECKS = [
     ("global search route exists", lambda _: 'Page.SEARCH -> GlobalSearchScreen(state, pad)' in MAIN),
     ("global search page is defined", lambda _: 'private fun GlobalSearchScreen(' in MAIN),
     ("global search button has localized accessibility label", lambda _: 'AppI18n.translate(LocalContext.current, "Buscar em todo o app")' in MAIN),
-    ("English translations exist", lambda _: 'private val english = mapOf(' in I18N),
-    ("Spanish translations exist", lambda _: 'private val spanish = mapOf(' in I18N),
+    ("critical UI and alert strings translated in English", lambda _: all(key in translation_keys("english") for key in LOCALIZED_UI_KEYS)),
+    ("English and Spanish dictionaries have matching keys", lambda _: translation_keys("english") == translation_keys("spanish")),
     ("article-game relationships are modeled", lambda _: has_all(MODEL, ('associatedGameIds: List<String>', 'associatedGameSlugs: List<String>'))),
     ("article detail respects endpoint entity type", lambda _: 'detailItem(item, preferGame = isGame)' in VM),
 ]
