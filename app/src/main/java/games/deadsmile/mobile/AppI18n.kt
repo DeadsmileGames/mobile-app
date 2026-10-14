@@ -328,6 +328,30 @@ object AppI18n {
         "Seu catálogo" to "Your catalog",
         "Ver jogo" to "View game",
         "Nenhum jogo corresponde à busca." to "No games match your search.",
+        "Navegação" to "Navigation",
+        "Deadsmile Games" to "Deadsmile Games",
+        "Reproduzir vídeo" to "Play video",
+        "Explorar catálogo" to "Browse catalog",
+        "Atualização da conta" to "Account update",
+        "Classificação indicativa" to "Age rating",
+        "Atualização do catálogo de jogos" to "Game catalog update",
+        "Jogos, notícias e novidades da Deadsmile." to "Games, news and updates from Deadsmile.",
+        "Aqui ficam os vídeos publicados e seus links oficiais." to "Published videos and their official links appear here.",
+        "Aqui você encontra o resumo do Companion e o carrossel de jogos." to "Here you’ll find the Companion overview and game carousel.",
+        "Esta aba mostra as publicações e notícias carregadas da plataforma." to "This tab shows posts and news from the platform.",
+        "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos." to "Sign in, manage your profile, and access your wishlist here.",
+        "Buscar em todo o app" to "Search across the app",
+        "Buscar jogos, notícias e vídeos" to "Search games, news, and videos",
+        "Digite para pesquisar conteúdo" to "Type to search content",
+        "Resultados da busca" to "Search results",
+        "Nenhum resultado encontrado." to "No results found.",
+        "Pesquise pelo nome do jogo, notícia ou vídeo." to "Search by game, news article, or video title.",
+        "Jogo" to "Game",
+        "Notícia" to "News",
+        "Vídeo" to "Video",
+        "Remover da busca" to "Clear search",
+        "O idioma precisa ser escolhido para continuar." to "Choose a language to continue.",
+        "Classificação não informada" to "Rating not provided",
     )
 
     private val spanish = mapOf(
@@ -650,16 +674,53 @@ object AppI18n {
         "Seu catálogo" to "Tu catálogo",
         "Ver jogo" to "Ver juego",
         "Nenhum jogo corresponde à busca." to "Ningún juego coincide con la búsqueda.",
+        "Español" to "Español",
+        "Navegação" to "Navegación",
+        "Deadsmile Games" to "Deadsmile Games",
+        "Reproduzir vídeo" to "Reproducir vídeo",
+        "Explorar catálogo" to "Explorar catálogo",
+        "Atualização da conta" to "Actualización de la cuenta",
+        "Classificação indicativa" to "Clasificación por edades",
+        "Atualização do catálogo de jogos" to "Actualización del catálogo de juegos",
+        "Jogos, notícias e novidades da Deadsmile." to "Juegos, noticias y novedades de Deadsmile.",
+        "Aqui ficam os vídeos publicados e seus links oficiais." to "Aquí encontrarás los vídeos publicados y sus enlaces oficiales.",
+        "Aqui você encontra o resumo do Companion e o carrossel de jogos." to "Aquí encontrarás el resumen de Companion y el carrusel de juegos.",
+        "Esta aba mostra as publicações e notícias carregadas da plataforma." to "Esta pestaña muestra las publicaciones y noticias de la plataforma.",
+        "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos." to "Desde aquí puedes iniciar sesión, gestionar tu perfil y acceder a tu lista de deseos.",
+        "Buscar em todo o app" to "Buscar en toda la aplicación",
+        "Buscar jogos, notícias e vídeos" to "Buscar juegos, noticias y vídeos",
+        "Digite para pesquisar conteúdo" to "Escribe para buscar contenido",
+        "Resultados da busca" to "Resultados de búsqueda",
+        "Nenhum resultado encontrado." to "No se encontraron resultados.",
+        "Pesquise pelo nome do jogo, notícia ou vídeo." to "Busca por el nombre del juego, noticia o vídeo.",
+        "Jogo" to "Juego",
+        "Notícia" to "Noticia",
+        "Vídeo" to "Vídeo",
+        "Remover da busca" to "Borrar búsqueda",
+        "O idioma precisa ser escolhido para continuar." to "Elige un idioma para continuar.",
+        "Classificação não informada" to "Clasificación no indicada",
     )
 
     fun translate(context: Context, value: String): String {
         val saved = runCatching {
             context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE).getString("app_language", "").orEmpty()
         }.getOrDefault("")
-        val systemLanguage = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
-            ?: Locale.getDefault().language
-        val language = saved.ifBlank { systemLanguage }
+        // No language is persisted until the user selects one. Portuguese is used only to
+        // render the mandatory language chooser, never to silently configure the app.
+        val language = saved.ifBlank { "pt-BR" }
         return translate(language, value)
+    }
+
+    fun selectedLocale(context: Context): Locale {
+        val selected = runCatching {
+            context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE)
+                .getString("app_language", "").orEmpty()
+        }.getOrDefault("")
+        return when (selected.lowercase(Locale.ROOT)) {
+            "en" -> Locale.ENGLISH
+            "es" -> Locale("es")
+            else -> Locale("pt", "BR")
+        }
     }
 
     internal fun translate(language: String, value: String): String {
