@@ -874,7 +874,8 @@ private fun GameDetailsScreen(
                         Text(if (isWishlisted) "Remover da lista de desejos" else "Adicionar à lista de desejos")
                     }
                 } else {
-                    val byline = listOf(item.author, item.publishedAt).filter { it.isNotBlank() }.joinToString(" · ")
+                    val dateLabel = item.publishedAt.takeIf { it.isNotBlank() }?.let { formatDisplayDate(it, LocalContext.current) }.orEmpty()
+                    val byline = listOf(item.author, dateLabel).filter { it.isNotBlank() }.joinToString(" · ")
                     if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(if (isGame) "Sobre o jogo" else "Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -972,11 +973,11 @@ private fun GameAvailabilityCard(item: FeedItem) {
                     availabilityMismatch -> "O catálogo indica disponibilidade no launcher, mas o status ainda não confirma lançamento. Confira a página oficial do jogo."
                     inDevelopment && countdown != null -> "Lançamento previsto em $countdown."
                     inDevelopment && item.releaseDate.isNotBlank() && target != null && target <= now -> "A data prevista passou, mas o catálogo ainda marca o jogo como em desenvolvimento."
-                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
+                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: ${formatDisplayDate(item.releaseDate, context)}."
                     inDevelopment -> "Ainda não há uma data de lançamento publicada."
                     announced && countdown != null -> "Anunciado. Lançamento previsto em $countdown."
                     announced && target != null && target <= now -> "A data prevista passou, mas o catálogo continua marcando o jogo como anunciado."
-                    announced && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
+                    announced && item.releaseDate.isNotBlank() -> "Data prevista: ${formatDisplayDate(item.releaseDate, context)}."
                     announced -> "O jogo foi anunciado, mas a data de lançamento ainda não foi divulgada."
                     else -> "Não há dados suficientes para confirmar a disponibilidade deste jogo. Consulte o site oficial."
                 }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -986,6 +987,17 @@ private fun GameAvailabilityCard(item: FeedItem) {
             }
         }
     }
+}
+
+private fun formatDisplayDate(value: String, context: Context): String {
+    val raw = value.trim()
+    if (raw.isBlank()) return ""
+    val locale = runCatching { context.resources.configuration.locales[0] }.getOrNull() ?: java.util.Locale.getDefault()
+    val date = runCatching { java.time.Instant.parse(raw).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }.getOrNull()
+        ?: runCatching { java.time.OffsetDateTime.parse(raw).toLocalDate() }.getOrNull()
+        ?: runCatching { java.time.LocalDate.parse(raw.take(10)) }.getOrNull()
+        ?: return raw
+    return date.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(locale))
 }
 
 private fun releaseTargetMillis(value: String): Long? {
