@@ -174,6 +174,8 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
     }
 
     private fun sendNotification(context: Context, id: Int, title: String, message: String) {
+        // Persist a local inbox entry as well as issuing the Android system notification.
+        LocalNotificationStore.add(context, title, message)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
