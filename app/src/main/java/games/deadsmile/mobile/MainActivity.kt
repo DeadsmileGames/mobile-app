@@ -35,6 +35,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,7 +109,8 @@ import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
     HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
-    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações")
+    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações"),
+    NOTIFICATIONS("Notificações"), VIDEO_PLAYER("Reprodutor")
 }
 
 private val BrandInk = Color(0xFF101010)
@@ -158,6 +162,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent { DeadsmileApp() }
     }
 }
@@ -174,6 +180,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
+    var appLanguage by rememberSaveable { mutableStateOf(prefs.getString("app_language", "").orEmpty()) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (themeMode) { 1 -> false; 2, 3 -> true; else -> systemDark }
     val scheme = when {
@@ -212,7 +219,9 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
                 reduceMotion = reduceMotion,
-                onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() }
+                onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() },
+                appLanguage = appLanguage,
+                onAppLanguage = { language -> appLanguage = language; prefs.edit().putString("app_language", language).apply() }
             )
         }
     }
@@ -227,10 +236,13 @@ private fun DeadsmileRoot(
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
     reduceMotion: Boolean,
-    onReduceMotion: (Boolean) -> Unit
+    onReduceMotion: (Boolean) -> Unit,
+    appLanguage: String,
+    onAppLanguage: (String) -> Unit
 ) {
     val state by vm.state.collectAsState()
     var page by rememberSaveable { mutableStateOf(Page.HOME) }
+    var videoItem by remember { mutableStateOf<FeedItem?>(null) }
     var returnPage by rememberSaveable { mutableStateOf(Page.HOME) }
     var detailItem by remember { mutableStateOf<FeedItem?>(null) }
     var detailIsGame by remember { mutableStateOf(false) }
@@ -342,8 +354,11 @@ private fun DeadsmileRoot(
         if (updateBusyVersion == null) beginUpdateDownload(newest)
     }
 
-    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
-        page = if (page == Page.GAMES) Page.HOME else returnPage
+    BackHandler(enabled = page != Page.HOME && tourStage < 0) {
+        page = when (page) {
+            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS, Page.VIDEO_PLAYER -> returnPage.takeIf { it != page } ?: Page.HOME
+            else -> Page.HOME
+        }
     }
 
     Scaffold(
@@ -369,13 +384,15 @@ private fun DeadsmileRoot(
                             Page.SETTINGS -> "Configurações"
                             Page.DETAILS -> "Detalhes"
                             Page.UPDATES -> "Atualizações"
+                            Page.NOTIFICATIONS -> "Notificações"
+                            Page.VIDEO_PLAYER -> "Reproduzindo"
                         }
                         Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
-                        IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS || page == Page.VIDEO_PLAYER) {
+                        IconButton(onClick = { page = when (page) { Page.GAMES -> Page.HOME; else -> returnPage.takeIf { it != page } ?: Page.HOME } }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
@@ -384,6 +401,11 @@ private fun DeadsmileRoot(
                     if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
+                        }
+                    }
+                    if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
+                        IconButton(onClick = { returnPage = page; page = Page.NOTIFICATIONS }) {
+                            Icon(Icons.Default.Notifications, contentDescription = AppI18n.translate(LocalContext.current, "Notificações"))
                         }
                     }
                     if (tourStage < 0) {
@@ -400,7 +422,7 @@ private fun DeadsmileRoot(
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && tourStage != 6) {
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER && tourStage != 6) {
                 val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
                 FloatingDock(
                     page = page,
@@ -448,17 +470,15 @@ private fun DeadsmileRoot(
                     openStory = { item -> detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS },
                     openCatalog = { returnPage = Page.HOME; page = Page.GAMES }
                 )
-                Page.GAMES -> FeedScreen("Catálogo de jogos", state.games, state.loading, pad) { item ->
+                Page.GAMES -> GameCatalogScreen(state.games, state.loading, pad) { item ->
                     detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS
                 }
                 Page.NEWS -> FeedScreen("Últimas notícias", state.news, state.loading, pad) {
                     detailItem = it; detailIsGame = false; returnPage = page; page = Page.DETAILS
                 }
                 Page.VIDEOS -> FeedScreen("Vídeos", state.videos, state.loading, pad) { item ->
-                    val url = item.url
-                    if (url != null) openExternal(context, url) else {
-                        detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS
-                    }
+                    if (item.url != null && youtubeVideoId(item.url) != null) { videoItem = item; returnPage = Page.VIDEOS; page = Page.VIDEO_PLAYER }
+                    else { detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS }
                 }
                 Page.LIBRARY -> LibraryScreen(state, pad) { page = Page.ACCOUNT }
                 Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.ACCOUNT; page = Page.WISHLIST }
@@ -473,8 +493,11 @@ private fun DeadsmileRoot(
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
                     reduceMotion = reduceMotion, onReduceMotion = onReduceMotion,
+                    appLanguage = appLanguage, onAppLanguage = onAppLanguage,
                     onOpenUpdates = { returnPage = Page.SETTINGS; page = Page.UPDATES }
                 )
+                Page.NOTIFICATIONS -> NotificationsScreen()
+                Page.VIDEO_PLAYER -> videoItem?.let { VideoPlayerScreen(it, pad) } ?: run { page = Page.VIDEOS }
                 Page.UPDATES -> UpdatesScreen(
                     releases = releases,
                     loading = releasesLoading,
@@ -503,7 +526,7 @@ private fun DeadsmileRoot(
                         onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
                         onOpenExternal = { url -> openExternal(context, url) },
-                        onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
+                        onOpenVideo = { displayItem.url?.let { url -> if (youtubeVideoId(url) != null) { videoItem = displayItem; returnPage = Page.DETAILS; page = Page.VIDEO_PLAYER } else openExternal(context, url) } }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
             }
@@ -544,6 +567,7 @@ private fun DeadsmileRoot(
             )
         }
     }
+    if (appLanguage.isBlank()) LanguageSelectionOverlay(onSelect = onAppLanguage)
     if (showInstallPermissionDialog && pendingUpdateFile != null) {
         AlertDialog(
             onDismissRequest = { showInstallPermissionDialog = false },
@@ -908,7 +932,7 @@ private fun GameDetailsScreen(
                     }
                 }
                 if (!isGame) {
-                    if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Abrir conteúdo") }
+                    if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Assistir no app") }
                     OutlinedButton(onClick = onOpenSite, modifier = Modifier.fillMaxWidth()) { Text("Visitar Deadsmile Games") }
                 }
             }
@@ -1142,16 +1166,17 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var avatarUrl by rememberSaveable { mutableStateOf("") }
     var avatarUrlInput by rememberSaveable { mutableStateOf("") }
     var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val avatarPrefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    var localAvatarPath by rememberSaveable { mutableStateOf(avatarPrefs.getString("local_avatar_path", null)) }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
-    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val encoded = runCatching { encodeProfileImage(context, uri) }.getOrNull()
-        if (encoded.isNullOrBlank()) {
-            avatarPickerMessage = "Não foi possível usar essa imagem. Escolha outra foto."
-        } else {
-            avatarUrl = encoded
-            avatarUrlInput = ""
-            avatarPickerMessage = "Foto selecionada. Salve o perfil para aplicar."
+        val saved = runCatching { copyProfileImage(context, uri) }.getOrNull()
+        if (saved == null) avatarPickerMessage = "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP."
+        else {
+            localAvatarPath = saved.absolutePath
+            avatarPrefs.edit().putString("local_avatar_path", saved.absolutePath).apply()
+            avatarPickerMessage = "Foto aplicada neste dispositivo. Não precisa salvar o perfil."
         }
     }
     var showEmailForm by rememberSaveable { mutableStateOf(false) }
@@ -1188,7 +1213,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             Card(shape = RoundedCornerShape(26.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        AccountAvatar(profile?.avatarUrl, Modifier.size(68.dp))
+                        AccountAvatar(localAvatarPath?.let { Uri.fromFile(File(it)).toString() } ?: profile?.avatarUrl, Modifier.size(68.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(profile?.fullName?.ifBlank { state.user.username } ?: state.user.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text("@" + (profile?.username?.ifBlank { state.user.username } ?: state.user.username), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1210,7 +1235,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedButton(onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { avatarPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
                         }
                         if (avatarUrl.startsWith("data:image/")) {
@@ -1222,7 +1247,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
-                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
+                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrlInput); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
@@ -1364,14 +1389,9 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
         return
     }
 
-    val images = remember(state.games, state.news, state.videos) {
-        (
-            state.games.flatMap { it.screenshots } +
-                state.games.mapNotNull { it.image } +
-                state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
-                state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
-            ).distinct().take(18)
-            
+    val images = remember(state.games) {
+        val abby = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) }
+        (abby?.screenshots.orEmpty().ifEmpty { listOfNotNull(abby?.image) }).distinct().take(12)
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
@@ -1519,6 +1539,26 @@ private fun decodeProfileImage(value: String?): Bitmap? {
     return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
 }
 
+private fun copyProfileImage(context: Context, uri: Uri): File? {
+    val resolver = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth / sample > 1024 || bounds.outHeight / sample > 1024) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+    val scaled = if (decoded.width > 768 || decoded.height > 768) {
+        val ratio = minOf(768f / decoded.width, 768f / decoded.height)
+        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
+    } else decoded
+    val destination = File(context.filesDir, "profile-avatar.jpg")
+    val ok = runCatching { destination.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) } }.getOrDefault(false)
+    if (scaled !== decoded) scaled.recycle()
+    decoded.recycle()
+    return destination.takeIf { ok && it.isFile && it.length() > 0L }
+}
+
 private fun encodeProfileImage(context: Context, uri: Uri): String? {
     val resolver = context.contentResolver
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -1553,6 +1593,8 @@ private fun SettingsScreen(
     onDynamicColors: (Boolean) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit,
+    appLanguage: String,
+    onAppLanguage: (String) -> Unit,
     onOpenUpdates: () -> Unit
 ) {
     LazyColumn(
@@ -1563,6 +1605,20 @@ private fun SettingsScreen(
         item {
             Text("Personalize sua experiência", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("Deixe o app do seu jeito. As mudanças são aplicadas na hora.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Idioma", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("O idioma é aplicado em todo o app.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    listOf("pt-BR" to "Português", "en" to "English", "es" to "Español").forEach { (code, label) ->
+                        Row(Modifier.fillMaxWidth().clickable { onAppLanguage(code) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = appLanguage == code, onClick = { onAppLanguage(code) })
+                            Text(label, Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
         item {
             Card(shape = RoundedCornerShape(22.dp)) {
