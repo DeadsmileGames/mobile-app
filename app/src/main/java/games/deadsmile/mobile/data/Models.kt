@@ -228,11 +228,27 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
             }
         }
         relatedObjects.forEach { entry -> entry.firstText("id", "uuid", "gameId", "game_id").takeIf { it.isNotBlank() }?.let(::add) }
+        relatedArrays.forEach { array ->
+            for (i in 0 until array.length()) {
+                when (val entry = array.opt(i)) {
+                    is String -> entry.takeIf { it.isNotBlank() }?.let(::add)
+                    is JSONObject -> entry.firstText("id", "uuid", "gameId", "game_id").takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }
     }.toList()
     val associatedSlugs = buildSet {
         listOf("gameSlug", "game_slug", "associatedGameSlug", "associated_game_slug", "relatedGameSlug", "related_game_slug")
             .map { o.firstText(it) }.filter { it.isNotBlank() }.forEach(::add)
         relatedObjects.forEach { entry -> entry.firstText("slug", "gameSlug", "game_slug").takeIf { it.isNotBlank() }?.let(::add) }
+        relatedArrays.forEach { array ->
+            for (i in 0 until array.length()) {
+                when (val entry = array.opt(i)) {
+                    is String -> entry.takeIf { it.isNotBlank() }?.let(::add)
+                    is JSONObject -> entry.firstText("slug", "gameSlug", "game_slug").takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }
     }.toList()
     return FeedItem(
         id = id,
@@ -311,7 +327,7 @@ fun JSONObject.detailItem(fallback: FeedItem, preferGame: Boolean? = null): Feed
         null -> optJSONObject("game") ?: optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
     }
     val parsed = itemFromJson(detail, fallback.id, true)
-    val rootRelated = if (detail !== this) itemFromJson(this, fallback.id, true).relatedGames else emptyList()
+    val root = if (detail !== this) itemFromJson(this, fallback.id, true) else null
     return parsed.copy(
         id = parsed.id.ifBlank { fallback.id },
         title = parsed.title.ifBlank { fallback.title },
@@ -325,9 +341,9 @@ fun JSONObject.detailItem(fallback: FeedItem, preferGame: Boolean? = null): Feed
         publishedAt = parsed.publishedAt.ifBlank { fallback.publishedAt },
         genres = parsed.genres.ifEmpty { fallback.genres },
         screenshots = parsed.screenshots.ifEmpty { fallback.screenshots },
-        relatedGames = (parsed.relatedGames + rootRelated + fallback.relatedGames).distinctBy { it.id },
-        associatedGameIds = (parsed.associatedGameIds + fallback.associatedGameIds).distinct(),
-        associatedGameSlugs = (parsed.associatedGameSlugs + fallback.associatedGameSlugs).distinct(),
+        relatedGames = (parsed.relatedGames + root?.relatedGames.orEmpty() + fallback.relatedGames).distinctBy { it.id },
+        associatedGameIds = (parsed.associatedGameIds + root?.associatedGameIds.orEmpty() + fallback.associatedGameIds).distinct(),
+        associatedGameSlugs = (parsed.associatedGameSlugs + root?.associatedGameSlugs.orEmpty() + fallback.associatedGameSlugs).distinct(),
         status = parsed.status.ifBlank { fallback.status },
         releaseDate = parsed.releaseDate.ifBlank { fallback.releaseDate },
         accessType = parsed.accessType.ifBlank { fallback.accessType },
