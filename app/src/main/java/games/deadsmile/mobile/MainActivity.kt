@@ -1383,18 +1383,23 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
         }
     }
 
-    Box(Modifier.fillMaxSize().padding(pad)) {
-        AnimatedContent(
-            targetState = imageIndex,
-            transitionSpec = { fadeIn(tween(650)) togetherWith fadeOut(tween(650)) },
-            label = "login-background"
-        ) { index ->
-            AsyncImage(
-                model = images.getOrNull(index),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+    Box(Modifier.fillMaxSize().padding(pad).background(MaterialTheme.colorScheme.background)) {
+        if (images.isNotEmpty()) {
+            AnimatedContent(
+                targetState = imageIndex.coerceIn(0, images.lastIndex),
+                transitionSpec = { fadeIn(tween(650)) togetherWith fadeOut(tween(650)) },
+                label = "login-background"
+            ) { index ->
+                SubcomposeAsyncImage(
+                    model = images.getOrNull(index),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                ) {
+                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                    else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                }
+            }
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
         Box(Modifier.fillMaxSize().background(BrushVerticalShade()))
