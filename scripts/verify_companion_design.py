@@ -139,6 +139,9 @@ RELEASE_CHECKS = [
     ("release workflow builds Play App Bundle", "bundlePlayRelease" in RELEASE_WORKFLOW),
     ("release workflow validates package and target API", "com.deadsmilegames.companion" in RELEASE_WORKFLOW and "targetSdkVersion:'36'" in RELEASE_WORKFLOW),
     ("release workflow rejects install permission in Play APK", "The Google Play build must not request REQUEST_INSTALL_PACKAGES." in RELEASE_WORKFLOW),
+    ("logout closes the authenticated socket", "restartRealtimeForSessionChange()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
+    ("logout clears cached private preferences", "privacy = PrivacyOptions()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
+    ("release tag points at the tested commit", 'gh release create "$TAG" --target "$GITHUB_SHA"' in RELEASE_WORKFLOW),
 ]
 
 GLOBAL_CHECKS = [
