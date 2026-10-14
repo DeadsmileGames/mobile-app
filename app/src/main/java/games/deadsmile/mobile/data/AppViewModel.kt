@@ -52,8 +52,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .build()
     @Volatile private var realtimeActive = false
     @Volatile private var realtimeSocket: WebSocket? = null
+    private var realtimeConnectionJob: Job? = null
     private var reconnectJob: Job? = null
     private var realtimeRefreshJob: Job? = null
+    private var posterEnrichmentJob: Job? = null
     @Volatile private var reconnectDelayMs = 1_000L
 
     init { reload(); account() }
@@ -66,37 +68,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disconnectRealtime() {
         realtimeActive = false
+        realtimeConnectionJob?.cancel()
+        realtimeConnectionJob = null
         reconnectJob?.cancel()
         reconnectJob = null
         realtimeSocket?.close(1000, "activity stopped")
         realtimeSocket = null
     }
 
+    private fun restartRealtimeForSessionChange() {
+        if (!realtimeActive) return
+        realtimeConnectionJob?.cancel()
+        realtimeConnectionJob = null
+        reconnectJob?.cancel()
+        reconnectJob = null
+        realtimeSocket?.close(1000, "account session changed")
+        realtimeSocket = null
+        openRealtimeSocket()
+    }
+
     private fun openRealtimeSocket() {
-        if (!realtimeActive || realtimeSocket != null) return
-        val request = Request.Builder()
-            .url("wss://api-ust8.onrender.com/api/live")
-            .header("Origin", "deadsmile-app://launcher")
-            .build()
-        val socket = realtimeClient.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (!realtimeActive) { webSocket.close(1000, "activity stopped"); return }
-                realtimeSocket = webSocket
-                reconnectDelayMs = 1_000L
+        if (!realtimeActive || realtimeSocket != null || realtimeConnectionJob?.isActive == true) return
+        realtimeConnectionJob = viewModelScope.launch {
+            // Authenticated sessions need a live-ticket minted from ApiClient's encrypted session cookies.
+            val ticket = withContext(Dispatchers.IO) {
+                runCatching {
+                    api.get("/platform/live-ticket").optString("ticket").takeIf { it.isNotBlank() }
+                }.getOrNull()
             }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                if (realtimeActive) handleRealtimeMessage(text)
+            if (!realtimeActive) return@launch
+            val url = buildString {
+                append("wss://api-ust8.onrender.com/api/live")
+                if (!ticket.isNullOrBlank()) append("?ticket=").append(ticket)
             }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                if (realtimeSocket === webSocket) realtimeSocket = null
-                scheduleRealtimeReconnect()
-            }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (realtimeSocket === webSocket) realtimeSocket = null
-                scheduleRealtimeReconnect()
-            }
-        })
-        if (realtimeActive) realtimeSocket = socket else socket.cancel()
+            val request = Request.Builder()
+                .url(url)
+                .header("Origin", "deadsmile-app://launcher")
+                .build()
+            val socket = realtimeClient.newWebSocket(request, object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    if (!realtimeActive) { webSocket.close(1000, "activity stopped"); return }
+                    realtimeSocket = webSocket
+                    reconnectDelayMs = 1_000L
+                }
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (realtimeActive) handleRealtimeMessage(text)
+                }
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    if (realtimeSocket === webSocket) realtimeSocket = null
+                    scheduleRealtimeReconnect()
+                }
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    if (realtimeSocket === webSocket) realtimeSocket = null
+                    scheduleRealtimeReconnect()
+                }
+            })
+            if (realtimeActive) realtimeSocket = socket else socket.cancel()
+        }
     }
 
     private fun scheduleRealtimeReconnect() {
@@ -115,9 +143,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         RealtimeNotificationDispatcher.dispatch(getApplication(), event)
         realtimeRefreshJob?.cancel()
         realtimeRefreshJob = viewModelScope.launch {
-            delay(250L)
-            refreshFirstPages(event, type)
-            if (type.startsWith("wishlist.", true) || type.startsWith("account.", true)) account()
+            delay(120L)
+            when (realtimeEventTarget(type)) {
+                RealtimeEventTarget.Wishlist -> loadWishlist()
+                RealtimeEventTarget.Account -> account()
+                RealtimeEventTarget.PublicContent -> refreshFirstPages(event, type)
+                RealtimeEventTarget.Ignore -> Unit
+            }
         }
     }
 
@@ -137,7 +169,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val deleted = type.endsWith(".deleted", true)
         fun mergeFresh(fresh: List<FeedItem>?, existing: List<FeedItem>): List<FeedItem> {
             val prior = if (deleted && entityId.isNotBlank()) existing.filterNot { it.id.equals(entityId, true) } else existing
-            return if (fresh == null) prior else (fresh + prior).distinctBy { it.id }.take(10_000)
+            if (fresh == null) return prior
+            val cached = existing.associateBy { it.id.lowercase() }
+            val mergedFresh = fresh.map { item ->
+                item.copy(posterImage = item.posterImage ?: cached[item.id.lowercase()]?.posterImage)
+            }
+            return (mergedFresh + prior).distinctBy { it.id }.take(10_000)
         }
         mutable.value = mutable.value.copy(
             news = mergeFresh(freshNews, mutable.value.news),
@@ -200,6 +237,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (generation != reloadGeneration) return@launch
         mutable.value = mutable.value.copy(news = all.first, videos = all.second, games = all.third)
+        posterEnrichmentJob?.cancel()
+        posterEnrichmentJob = viewModelScope.launch {
+            val enriched = enrichStorePosters(all.third)
+            if (generation == reloadGeneration) mutable.value = mutable.value.copy(games = enriched)
+        }
+    }
+
+    private suspend fun enrichStorePosters(items: List<FeedItem>): List<FeedItem> = withContext(Dispatchers.IO) {
+        val gate = Semaphore(4)
+        coroutineScope {
+            items.map { game ->
+                async {
+                    if (!game.posterImage.isNullOrBlank() || game.microsoftStoreUrl.isNullOrBlank() || game.slug.isBlank()) {
+                        game
+                    } else {
+                        gate.withPermit {
+                            runCatching { api.get("/games/" + game.slug).detailItem(game) }.getOrDefault(game)
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
     }
 
     private suspend fun completeOffsetFeed(
@@ -259,8 +318,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun account() = viewModelScope.launch {
+        val previousUserId = mutable.value.user?.id
         val user = withContext(Dispatchers.IO) { runCatching { api.get("/auth/me").userAccount() }.getOrNull() }
         mutable.value = mutable.value.copy(user = user)
+        if (previousUserId != user?.id) restartRealtimeForSessionChange()
         if (user != null) {
             library()
             loadWishlist()
@@ -296,7 +357,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun saveProfile(username: String, bio: String, websiteUrl: String, location: String, avatarUrl: String) = viewModelScope.launch {
+    fun saveProfile(username: String, bio: String, websiteUrl: String, location: String) = viewModelScope.launch {
         if (mutable.value.busy) return@launch
         val user = mutable.value.user ?: return@launch
         mutable.value = mutable.value.copy(busy = true, error = null)
@@ -307,8 +368,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     .put("username", username.trim())
                     .put("bio", bio)
                     .put("websiteUrl", websiteUrl.trim())
-                    .put("location", location.trim())
-                    .put("avatarUrl", avatarUrl.trim()))
+                    .put("location", location.trim()))
             }
             mutable.value = mutable.value.copy(
                 accountProfile = result.accountProfile(fallback),
@@ -500,5 +560,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             in 500..599 -> "O serviço está indisponível agora. Tente novamente mais tarde."
             else -> "Não foi possível concluir agora. Tente novamente."
         }
+    }
+}
+
+
+internal enum class RealtimeEventTarget { Ignore, Wishlist, Account, PublicContent }
+
+internal fun realtimeEventTarget(type: String): RealtimeEventTarget {
+    val eventType = type.trim().lowercase()
+    return when {
+        eventType.isBlank() || eventType == "connected" -> RealtimeEventTarget.Ignore
+        eventType.startsWith("wishlist.") -> RealtimeEventTarget.Wishlist
+        eventType.startsWith("account.") || eventType.startsWith("achievement.") -> RealtimeEventTarget.Account
+        eventType.startsWith("game.") || eventType.startsWith("news.") || eventType.startsWith("video.") ->
+            RealtimeEventTarget.PublicContent
+        else -> RealtimeEventTarget.Ignore
     }
 }

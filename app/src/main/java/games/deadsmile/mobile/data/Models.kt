@@ -35,6 +35,7 @@ data class FeedItem(
     val featured: Boolean = false,
     val platforms: List<String> = emptyList(),
     val ageRating: String = "",
+    val posterImage: String? = null,
     val ratingSystem: String = "",
     val ratingDescription: String = "",
     val ratingDescriptors: List<String> = emptyList(),
@@ -135,6 +136,18 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
     val title = o.firstText("title", "name", "gameTitle", "game_title").ifBlank { "Sem título" }
     val storeInfo = o.optJSONObject("microsoftStore") ?: o.optJSONObject("microsoftStoreBadge")
     val primaryRating = o.optJSONObject("primaryRating") ?: storeInfo?.optJSONObject("primaryRating")
+    val storeImages = storeInfo?.optJSONArray("images") ?: JSONArray()
+    val posterImage = buildList {
+        for (index in 0 until storeImages.length()) {
+            val candidate = storeImages.optJSONObject(index) ?: continue
+            val purpose = candidate.firstText("purpose", "imageType", "image_type")
+            if (!Regex("(?i)poster|boxart|cover").containsMatchIn(purpose)) continue
+            val url = candidate.firstText("url", "imageUrl", "image_url")
+            val resolved = resolveAssetUrl(url) ?: continue
+            add(Triple(resolved, candidate.optInt("height", 0), candidate.optInt("width", 0)))
+        }
+    }.sortedWith(compareBy<Triple<String, Int, Int>>({ if (it.second > it.third) 0 else 1 }, { -it.second }))
+        .firstOrNull()?.first
     val slug = o.firstText("slug", "newsSlug", "gameSlug")
     val id = o.firstText("id", "uuid", "gameId", "game_id").ifBlank { slug.ifBlank { fallbackId } }
     val image = resolveAssetUrl(o.firstText(
@@ -215,10 +228,10 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         ageRating = o.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age")
             .ifBlank { storeInfo?.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age").orEmpty() }
             .ifBlank {
-                val label = primaryRating?.firstText("label").orEmpty()
-                val age = primaryRating?.optInt("age", -1)?.takeIf { it >= 0 }?.let { "$it+" }.orEmpty()
-                listOf(label, age).filter { it.isNotBlank() }.distinct().joinToString(" · ")
+                primaryRating?.optInt("age", -1)?.takeIf { it >= 0 }?.let { "$it+" }
+                    ?: primaryRating?.firstText("label").orEmpty()
             },
+        posterImage = posterImage,
         ratingSystem = o.firstText("ratingSystem", "rating_system").ifBlank { primaryRating?.firstText("system").orEmpty() },
         ratingDescription = o.firstText("ratingDescription", "rating_description").ifBlank { primaryRating?.firstText("description").orEmpty() },
         ratingDescriptors = (o.optJSONArray("ratingDescriptors") ?: primaryRating?.optJSONArray("descriptors") ?: JSONArray()).strings(),
@@ -282,6 +295,7 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         featured = if (detail.has("featured")) parsed.featured else fallback.featured,
         platforms = parsed.platforms.ifEmpty { fallback.platforms },
         ageRating = parsed.ageRating.ifBlank { fallback.ageRating },
+        posterImage = parsed.posterImage ?: fallback.posterImage,
         ratingSystem = parsed.ratingSystem.ifBlank { fallback.ratingSystem },
         ratingDescription = parsed.ratingDescription.ifBlank { fallback.ratingDescription },
         ratingDescriptors = parsed.ratingDescriptors.ifEmpty { fallback.ratingDescriptors },
