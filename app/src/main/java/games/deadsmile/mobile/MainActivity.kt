@@ -601,7 +601,15 @@ private fun GameDetailsScreen(
         item {
             Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 item.image?.let { image ->
-                    AsyncImage(image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    SubcomposeAsyncImage(model = image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                        if (painter.state is AsyncImagePainter.State.Success) {
+                            SubcomposeAsyncImageContent()
+                        } else {
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
@@ -817,9 +825,13 @@ private fun WishlistScreen(
             items(state.wishlist, key = { it.id }) { game ->
                 Card(shape = RoundedCornerShape(20.dp)) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (game.image != null) AsyncImage(game.image, game.title, Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
-                        else Box(Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp))
+                        Box(Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                            if (game.image != null) {
+                                SubcomposeAsyncImage(model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                    else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Text(game.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
@@ -873,8 +885,14 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (game.image != null) AsyncImage(game.image, game.title, Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
-                        else Box(Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) { Icon(Icons.Default.CollectionsBookmark, null) }
+                        Box(Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                            if (game.image != null) {
+                                SubcomposeAsyncImage(model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                    else Icon(Icons.Default.CollectionsBookmark, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else Icon(Icons.Default.CollectionsBookmark, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(game.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             if (game.summary.isNotBlank()) Text(game.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
