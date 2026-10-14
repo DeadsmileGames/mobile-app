@@ -22,7 +22,6 @@ import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Checks the app's public feeds periodically; Android controls exact run timing to preserve battery. */
 class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
 
@@ -53,7 +52,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         for (stream in streams) {
             val items = runCatching { stream.load().distinctBy { it.id } }
                 .onFailure { failures++ }.getOrNull() ?: continue
-            // A successful empty response is still a valid baseline. This lets the first future item notify.
             succeeded++
             val key = "notification_seen_ids_" + stream.key
             val previous = preferences.getString(key, null)
@@ -66,12 +64,10 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                 }.getOrDefault(emptySet())
             }
             if (seenIds == null) {
-                // The first successful poll establishes a baseline and never emits historical alerts.
                 preferences.edit().putString(key, JSONArray(items.map { it.id }).toString()).apply()
                 continue
             }
 
-            // Compare every identifier in the current page, not only its first row.
             val newer = items.filterNot { it.id in seenIds }.take(3)
             val refreshedIds = (items.map { it.id } + seenIds).distinct().take(144)
             preferences.edit().putString(key, JSONArray(refreshedIds).toString()).apply()
@@ -83,11 +79,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         if (succeeded == 0 && failures > 0) Result.retry() else Result.success()
     }
 
-
-    /**
-     * Mirrors the event cursor used by the Windows launcher. A new install establishes
-     * a baseline first; subsequent runs notify about meaningful platform events.
-     */
     private fun pollPlatformEvents(context: Context, api: ApiClient, preferences: SharedPreferences) {
         val establishBaseline = !preferences.getBoolean("notification_event_initialized", false)
         var cursor = preferences.getLong("notification_event_cursor", 0L)
@@ -112,7 +103,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
             }
             preferences.edit().putLong("notification_event_cursor", cursor).apply()
             if (caughtUp) preferences.edit().putBoolean("notification_event_initialized", true).apply()
-            // Do not notify about historical events while the first baseline catches up.
             if (establishBaseline || !caughtUp) return
             val deliveredByLiveSocket = runCatching {
                 val saved = JSONArray(preferences.getString("realtime_notified_ids", "[]"))
@@ -121,7 +111,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                 }
             }.getOrDefault(emptySet())
             newEvents.forEach { event ->
-                // Foreground WebSocket delivery already showed these events. Do not duplicate them here.
                 if (event.optString("id").takeIf { it.isNotBlank() } in deliveredByLiveSocket) return@forEach
                 val type = event.optString("event_type").ifBlank { event.optString("type") }
                 val prefKey = when {
@@ -140,7 +129,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                 )
             }
         } catch (_: Exception) {
-            // Event feeds are optional when signed out; public-feed checks can still run.
         }
     }
 
@@ -182,7 +170,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
     }
 
     private fun sendNotification(context: Context, id: Int, title: String, message: String) {
-        // Persist a local inbox entry as well as issuing the Android system notification.
         LocalNotificationStore.add(context, title, message)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

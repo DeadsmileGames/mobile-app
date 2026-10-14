@@ -15,11 +15,22 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
 
 android {
     namespace = "games.deadsmile.mobile"
-    compileSdk = 35
+    compileSdk = 36
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("direct") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "false")
+        }
+    }
     defaultConfig {
-        applicationId = "games.deadsmile.mobile"
+        applicationId = "com.deadsmilegames.companion"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = providers.gradleProperty("appVersionCode").orElse("1001000").get().toInt()
         versionName = providers.gradleProperty("appVersionName").orElse("1.1.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -62,6 +73,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.google.errorprone:error_prone_annotations:2.50.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")

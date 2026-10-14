@@ -1,15 +1,17 @@
-#!/usr/bin/env python3
-"""Static pre-build contracts for the Deadsmile Companion UI.
 
-These checks deliberately run before Gradle. They catch accidental removal of
-navigation, screen structure, localization boundaries, and key layout contracts.
-They do not replace emulator screenshot tests or pixel-diff visual regression.
-"""
 from pathlib import Path
 import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+GRADLE_PATH = ROOT / "app/build.gradle.kts"
+MANIFEST_PATH = ROOT / "app/src/main/AndroidManifest.xml"
+DIRECT_MANIFEST_PATH = ROOT / "app/src/direct/AndroidManifest.xml"
+RELEASE_WORKFLOW_PATH = ROOT / ".github/workflows/release-android.yml"
+UPDATES_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/UpdatesScreen.kt"
+STRINGS_PATH = ROOT / "app/src/main/res/values/strings.xml"
+STRINGS_EN_PATH = ROOT / "app/src/main/res/values-en/strings.xml"
+ANDROID_WORKFLOW_PATH = ROOT / ".github/workflows/android-apk.yml"
 MAIN_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/MainActivity.kt"
 I18N_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/AppI18n.kt"
 API_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/data/ApiClient.kt"
@@ -31,9 +33,16 @@ MODEL = read(MODEL_PATH)
 VM = read(VM_PATH)
 WORKER = read(WORKER_PATH)
 DISPATCH = read(DISPATCH_PATH)
+GRADLE = read(GRADLE_PATH)
+MANIFEST = read(MANIFEST_PATH)
+DIRECT_MANIFEST = read(DIRECT_MANIFEST_PATH)
+RELEASE_WORKFLOW = read(RELEASE_WORKFLOW_PATH)
+UPDATES = read(UPDATES_PATH)
+STRINGS = read(STRINGS_PATH)
+STRINGS_EN = read(STRINGS_EN_PATH)
+ANDROID_WORKFLOW = read(ANDROID_WORKFLOW_PATH)
 
 def function_block(source: str, name: str) -> str:
-    """Extract a composable function through the next @Composable declaration."""
     pattern = re.compile(r"@Composable\s+(?:private\s+)?fun\s+" + re.escape(name) + r"\s*\(")
     match = pattern.search(source)
     if not match:
@@ -62,8 +71,6 @@ def has_all(source: str, tokens: tuple[str, ...]) -> bool:
     return all(token in source for token in tokens)
 
 def is_balanced(source: str) -> bool:
-    # Curly delimiters inside Kotlin interpolation are balanced too. A raw count
-    # is a simple regression guard, not a Kotlin parser.
     return source.count("{") == source.count("}")
 
 def translation_keys(map_name: str) -> set[str]:
@@ -115,8 +122,29 @@ LOCALIZED_UI_KEYS = (
     "Confira os dados informados e tente novamente.",
 )
 
-# 25 shared contracts repeated against each screen's dependencies. This makes
-# the same language/navigation/runtime assumptions mandatory for every UI area.
+RELEASE_CHECKS = [
+    ("approved application ID is configured", 'applicationId = "com.deadsmilegames.companion"' in GRADLE),
+    ("compile SDK targets API 36", "compileSdk = 36" in GRADLE),
+    ("target SDK is API 36", "targetSdk = 36" in GRADLE),
+    ("release shrink has Tink Error Prone annotations available", 'implementation("com.google.errorprone:error_prone_annotations:2.50.0")' in GRADLE),
+    ("direct flavor is configured", 'create("direct")' in GRADLE and 'buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "true")' in GRADLE),
+    ("Play flavor is configured", 'create("play")' in GRADLE and 'buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "false")' in GRADLE),
+    ("base manifest has no package installation permission", "REQUEST_INSTALL_PACKAGES" not in MANIFEST),
+    ("direct manifest retains update permission", "REQUEST_INSTALL_PACKAGES" in DIRECT_MANIFEST),
+    ("Play update UI defers updates to Google Play", 'isPlayDistribution -> "As atualizações desta versão são gerenciadas pela Google Play."' in UPDATES),
+    ("launcher label is the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS),
+    ("English launcher label matches the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS_EN),
+    ("CI smoke-builds release APK and Play AAB variants", "assembleDirectRelease assemblePlayRelease bundlePlayRelease" in ANDROID_WORKFLOW),
+    ("CI verifies Play APK omits package installation permission", "PLAY_PERMS" in ANDROID_WORKFLOW and "REQUEST_INSTALL_PACKAGES" in ANDROID_WORKFLOW),
+    ("release workflow builds direct APK", "assembleDirectRelease" in RELEASE_WORKFLOW),
+    ("release workflow builds Play App Bundle", "bundlePlayRelease" in RELEASE_WORKFLOW),
+    ("release workflow validates package and target API", "com.deadsmilegames.companion" in RELEASE_WORKFLOW and "targetSdkVersion:'36'" in RELEASE_WORKFLOW),
+    ("release workflow rejects install permission in Play APK", "The Google Play build must not request REQUEST_INSTALL_PACKAGES." in RELEASE_WORKFLOW),
+    ("logout closes the authenticated socket", "restartRealtimeForSessionChange()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
+    ("logout clears cached private preferences", "privacy = PrivacyOptions()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
+    ("release tag points at the tested commit", 'gh release create "$TAG" --target "$GITHUB_SHA"' in RELEASE_WORKFLOW),
+]
+
 GLOBAL_CHECKS = [
     ("mandatory language-selection gate", lambda _: 'if (appLanguage.isBlank())' in MAIN),
     ("language chooser persists only explicit Portuguese choice", lambda _: 'onSelect("pt-BR")' in MAIN),
@@ -145,7 +173,6 @@ GLOBAL_CHECKS = [
     ("article detail respects endpoint entity type", lambda _: 'detailItem(item, preferGame = isGame)' in VM),
 ]
 
-# 15 contracts per named screen; positive and negative assertions are explicit.
 SCREEN_CHECKS: dict[str, list[tuple[str, bool]]] = {
     "Home": [
         ("renders game posters", True), ("uses image-first card", True), ("poster selection supported", True),
@@ -246,7 +273,6 @@ SCREEN_CHECKS: dict[str, list[tuple[str, bool]]] = {
     ],
 }
 
-# The structural contract adds 10 checks per screen. 50 * 13 screens = 650.
 def structure_checks(name: str, block: str) -> list[tuple[str, bool]]:
     return [
         (f"{name}: function found", bool(block)),
@@ -276,8 +302,6 @@ def check_screen(name: str) -> None:
     if len(checks) != 15:
         raise SystemExit(f"Internal audit error: {name} has {len(checks)} local checks, expected 15")
     for label, positive in checks:
-        # Tokens for each component are kept explicit to avoid ambiguous regex
-        # scans over a 2,000-line Compose file.
         tokens = FEATURE_TOKENS[name][label]
         present = all(token in block for token in tokens)
         run(f"{name}: {label}", present if positive else not present)
@@ -422,7 +446,9 @@ FEATURE_TOKENS: dict[str, dict[str, tuple[str, ...]]] = {
 def main() -> int:
     for name in SCREEN_CHECKS:
         check_screen(name)
-    expected = 50 * len(SCREEN_CHECKS)
+    for label, result in RELEASE_CHECKS:
+        run("release: " + label, result)
+    expected = 50 * len(SCREEN_CHECKS) + len(RELEASE_CHECKS)
     if TOTAL != expected:
         print(f"INTERNAL AUDIT ERROR: ran {TOTAL} checks; expected {expected}.", file=sys.stderr)
         return 2
@@ -431,7 +457,7 @@ def main() -> int:
         for failure in FAILURES:
             print(" - " + failure)
         return 1
-    print(f"COMPANION DESIGN AUDIT PASSED: {TOTAL} static contracts across {len(SCREEN_CHECKS)} UI areas")
+    print(f"COMPANION DESIGN AUDIT PASSED: {TOTAL} static contracts across {len(SCREEN_CHECKS)} UI areas and {len(RELEASE_CHECKS)} release contracts")
     print("Note: static source checks do not replace emulator/device screenshot and accessibility validation.")
     return 0
 

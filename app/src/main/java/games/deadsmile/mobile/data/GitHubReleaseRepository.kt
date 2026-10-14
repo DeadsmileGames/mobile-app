@@ -108,7 +108,7 @@ object GitHubReleaseRepository {
                                 id = item.optLong("id"),
                                 tagName = tag,
                                 version = version,
-                                name = item.optString("name").ifBlank { "Deadsmile Games Companion $version" },
+                                name = item.optString("name").ifBlank { "Deadsmile Games $version" },
                                 body = item.optString("body"),
                                 publishedAt = item.optString("published_at"),
                                 htmlUrl = item.optString("html_url").takeIf(::isHttpsGithubUrl).orEmpty(),
@@ -151,7 +151,6 @@ object GitHubReleaseRepository {
             val right = bv.getOrElse(index) { 0 }
             if (left != right) return left.compareTo(right)
         }
-        // Stable release wins over the same numeric prerelease tag.
         val aStable = first.substringAfter('-', "").isEmpty()
         val bStable = second.substringAfter('-', "").isEmpty()
         return aStable.compareTo(bStable)
@@ -184,7 +183,7 @@ object GitHubReleaseRepository {
     suspend fun download(context: Context, release: GitHubRelease, onProgress: suspend (Int) -> Unit): File =
         withContext(Dispatchers.IO) {
             val url = release.apkUrl ?: throw IOException("Esta release não contém um APK.")
-            if (!isTrustedApkUrl(url)) throw IOException("O link do APK não pertence às releases oficiais do Companion.")
+            if (!isTrustedApkUrl(url)) throw IOException("O link do APK não pertence às releases oficiais de Deadsmile Games.")
             if (release.apkSize > MAX_APK_BYTES) throw IOException("O APK ultrapassa o tamanho máximo permitido.")
 
             val request = Request.Builder()

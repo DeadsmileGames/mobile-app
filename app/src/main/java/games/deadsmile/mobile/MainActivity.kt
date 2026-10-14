@@ -202,7 +202,6 @@ private fun Text(
     )
 }
 
-
 class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
@@ -281,7 +280,6 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 onAppLanguage = { language ->
                     appLanguage = language
                     prefs.edit().putString("app_language", language).apply()
-                    // Re-fetch content using the user-selected language (including age ratings).
                     vm.reload()
                     vm.account()
                 }
@@ -358,7 +356,7 @@ private fun DeadsmileRoot(
 
     val beginUpdateDownload: (GitHubRelease) -> Unit = { release ->
         updateScope.launch {
-            if (BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") {
+            if ((!BuildConfig.IS_DIRECT_DISTRIBUTION || BuildConfig.DEBUG)) {
                 autoUpdateError = "A instalação automática exige a versão de distribuição assinada."
             } else {
                 updateBusyVersion = release.version
@@ -403,7 +401,6 @@ private fun DeadsmileRoot(
         try {
             releases = GitHubReleaseRepository.fetchReleases()
             val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME)
-            // Update download is deferred until the one-time tour ends.
         } catch (error: Exception) {
             releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
         } finally {
@@ -412,7 +409,7 @@ private fun DeadsmileRoot(
     }
 
     LaunchedEffect(tourStage, releasesLoading, releases) {
-        if (tourStage >= 0 || releasesLoading || BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") return@LaunchedEffect
+        if (tourStage >= 0 || releasesLoading || (!BuildConfig.IS_DIRECT_DISTRIBUTION || BuildConfig.DEBUG)) return@LaunchedEffect
         val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME) ?: return@LaunchedEffect
         if (updateBusyVersion == null) beginUpdateDownload(newest)
     }
@@ -586,7 +583,8 @@ private fun DeadsmileRoot(
                     updateBusyVersion = updateBusyVersion,
                     updateProgress = updateProgress,
                     autoUpdateError = autoUpdateError,
-                    allowInstall = BuildConfig.APPLICATION_ID == "games.deadsmile.mobile",
+                    allowInstall = (BuildConfig.IS_DIRECT_DISTRIBUTION && !BuildConfig.DEBUG),
+                    isPlayDistribution = !BuildConfig.IS_DIRECT_DISTRIBUTION,
                     onRefresh = ::refreshReleases,
                     onInstall = beginUpdateDownload,
                     onOpenRelease = { url -> openExternal(context, url) }
@@ -634,7 +632,7 @@ private fun DeadsmileRoot(
                     else -> "Navegação"
                 },
                 description = when (target) {
-                    Page.HOME -> "Aqui você encontra o resumo do Companion e o carrossel de jogos."
+                    Page.HOME -> "Aqui você encontra o resumo de Deadsmile Games e o carrossel de jogos."
                     Page.NEWS -> "Esta aba mostra as publicações e notícias carregadas da plataforma."
                     Page.VIDEOS -> "Aqui ficam os vídeos publicados e seus links oficiais."
                     Page.LIBRARY -> "A biblioteca exibe os jogos da sua conta para PC, sem instalar jogos no Android."
@@ -657,7 +655,7 @@ private fun DeadsmileRoot(
         AlertDialog(
             onDismissRequest = { showInstallPermissionDialog = false },
             title = { Text("Atualização pronta") },
-            text = { Text("O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android.") },
+            text = { Text("O APK foi baixado. Para continuar, permita que Deadsmile Games solicite a instalação desta versão nas configurações do Android.") },
             confirmButton = {
                 TextButton(onClick = {
                     showInstallPermissionDialog = false
@@ -676,8 +674,8 @@ private fun TourWelcomeOverlay(onStart: () -> Unit, onSkip: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
         Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Bem-vindo ao Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Bem-vindo ao Deadsmile Games", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Conheça as áreas principais de Deadsmile Games. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Começar tour") }
                 TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Pular por enquanto") }
             }
@@ -710,7 +708,7 @@ private fun TourThanksOverlay(onFinish: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
         Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Obrigado por conhecer o Companion!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Obrigado por conhecer Deadsmile Games!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text("Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Concluir e acessar a conta") }
             }
@@ -792,7 +790,7 @@ private fun Home(
                     hero?.let { GameArtwork(it, Modifier.fillMaxSize()) }
                     Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))))
                     Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text(hero?.title ?: "Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(hero?.title ?: "Deadsmile Games", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(hero?.summary ?: "Jogos, notícias e novidades da Deadsmile.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .88f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(onClick = { if (hero != null) openGame(hero) else openCatalog() }) { Text("Ver jogo") }
@@ -1108,7 +1106,6 @@ private fun GameDetailsScreen(
                     if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-                // Keep database-authored game content; don't add a second About the game heading.
                 val completeBody = item.body.ifBlank {
                     item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." }
                 }
@@ -1752,7 +1749,6 @@ private fun BrushVerticalShade(): androidx.compose.ui.graphics.Brush =
         colors = listOf(Color(0xAA000000), Color(0x33000000), Color(0xDD000000))
     )
 
-
 @Composable
 private fun AccountAvatar(url: String?, modifier: Modifier = Modifier) {
     val bitmap = remember(url) { decodeProfileImage(url) }
@@ -1887,7 +1883,7 @@ private fun SettingsScreen(
             Card(shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sobre", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Deadsmile Games Companion for Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Deadsmile Games for Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -2043,7 +2039,6 @@ private fun openExternal(context: Context, value: String) {
         context.startActivity(intent)
     }
 }
-
 
 @Composable
 private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {

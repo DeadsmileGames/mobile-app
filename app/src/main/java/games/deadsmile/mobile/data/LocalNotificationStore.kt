@@ -11,7 +11,6 @@ data class LocalNotification(
     val timestamp: Long
 )
 
-/** Small, bounded local inbox. No account data or remote notification content is synchronized elsewhere. */
 object LocalNotificationStore {
     private const val PREFS = "deadsmile-local-notifications"
     private const val KEY = "items"
