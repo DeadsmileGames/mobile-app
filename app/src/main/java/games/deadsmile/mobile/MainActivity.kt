@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -177,6 +178,9 @@ private fun DeadsmileRoot(
     LaunchedEffect(page, detailItem?.id, detailItem?.slug, detailIsGame) {
         if (page == Page.DETAILS) detailItem?.let { vm.loadDetails(it, detailIsGame) }
     }
+    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES) {
+        page = if (page == Page.GAMES) Page.HOME else returnPage
+    }
 
     Scaffold(
         topBar = {
@@ -196,8 +200,8 @@ private fun DeadsmileRoot(
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST) {
-                        IconButton(onClick = { page = if (page == Page.DETAILS) returnPage else returnPage }) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES) {
+                        IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                         }
                     }
@@ -237,7 +241,7 @@ private fun DeadsmileRoot(
                     news = { page = Page.NEWS }, videos = { page = Page.VIDEOS },
                     openGame = { item -> detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS },
                     openStory = { item -> detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS },
-                    openCatalog = { page = Page.GAMES }
+                    openCatalog = { returnPage = Page.HOME; page = Page.GAMES }
                 )
                 Page.GAMES -> FeedScreen("Catálogo de jogos", state.games, state.loading, pad) { item ->
                     detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS
@@ -577,7 +581,7 @@ private fun GameDetailsScreen(
                 val completeBody = item.body.ifBlank { item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." } }
                 Text(completeBody, style = MaterialTheme.typography.bodyLarge, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.14f)
                 if (item.screenshots.isNotEmpty()) {
-                    Text("Capturas de tela", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(if (isGame) "Capturas de tela" else "Imagens do artigo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(item.screenshots, key = { it }) { screenshot ->
                             AsyncImage(
@@ -932,7 +936,12 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     }
 
     val images = remember(state.games, state.news, state.videos) {
-        (state.games + state.news + state.videos).mapNotNull { it.image }.distinct().take(12)
+        (
+            state.games.flatMap { it.screenshots } +
+                state.games.mapNotNull { it.image } +
+                state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
+                state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
+            ).distinct().take(18)
             .ifEmpty { listOf("https://raw.githubusercontent.com/deadsmilegames/launcher/main/winui/src/Deadsmile.Launcher/Assets/LargeTile.png") }
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
