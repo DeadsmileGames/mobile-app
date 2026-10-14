@@ -16,6 +16,17 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
 android {
     namespace = "games.deadsmile.mobile"
     compileSdk = 36
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("direct") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "false")
+        }
+    }
     defaultConfig {
         applicationId = "com.deadsmilegames.companion"
         minSdk = 26
