@@ -1086,7 +1086,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var code by rememberSaveable { mutableStateOf("") }
     var registerMode by rememberSaveable { mutableStateOf(false) }
 
-    var fullName by rememberSaveable { mutableStateOf("") }
     var profileBio by rememberSaveable { mutableStateOf("") }
     var websiteUrl by rememberSaveable { mutableStateOf("") }
     var location by rememberSaveable { mutableStateOf("") }
@@ -1116,7 +1115,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 
     LaunchedEffect(state.accountProfile) {
         state.accountProfile?.let { profile ->
-            fullName = profile.fullName
             username = profile.username
             profileBio = profile.bio
             websiteUrl = profile.websiteUrl
@@ -1150,7 +1148,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     if (state.accountLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (editingProfile) {
                         HorizontalDivider()
-                        OutlinedTextField(fullName, { fullName = it.take(80) }, label = { Text("Nome de exibição") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(username, { username = it.take(24) }, label = { Text("Nome de usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
@@ -1175,13 +1172,12 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
-                            onClick = { vm.saveProfile(fullName, username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
+                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
                         TextButton(onClick = { editingProfile = false; profile?.let {
                             username = it.username
-                            fullName = it.fullName
                             profileBio = it.bio
                             websiteUrl = it.websiteUrl
                             location = it.location
@@ -1573,8 +1569,7 @@ private fun SettingsScreen(
             Card(shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sobre", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Deadsmile Games para Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Conteúdo conectado à plataforma Deadsmile. A biblioteca mostra seus jogos para PC; instalações no Android não estão disponíveis.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Deadsmile Games Companion for Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
