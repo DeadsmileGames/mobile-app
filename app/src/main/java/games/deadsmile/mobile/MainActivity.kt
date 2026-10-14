@@ -707,12 +707,7 @@ private fun Home(
             val hero = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) } ?: state.games.firstOrNull()
             Card(Modifier.fillMaxWidth().height(310.dp), shape = RoundedCornerShape(28.dp)) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                    hero?.image?.let { heroImage ->
-                        SubcomposeAsyncImage(model = heroImage, contentDescription = hero.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                            if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
-                            else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh))
-                        }
-                    }
+                    hero?.let { GameArtwork(it, Modifier.fillMaxSize()) }
                     Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))))
                     Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("DEADSMILE GAMES", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .88f), fontWeight = FontWeight.Bold)
@@ -852,21 +847,8 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(Modifier.fillMaxSize()) {
-            if (item.image != null) {
-                Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                    SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                        if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        } else SubcomposeAsyncImageContent()
-                    }
-                }
-            } else {
-                Box(
-                    Modifier.fillMaxWidth().height(if (compact) 106.dp else 112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                GameArtwork(item, Modifier.fillMaxSize())
             }
             Column(Modifier.fillMaxWidth().weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
@@ -900,16 +882,8 @@ private fun GameDetailsScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                item.image?.let { image ->
-                    SubcomposeAsyncImage(model = image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                        if (painter.state is AsyncImagePainter.State.Success) {
-                            SubcomposeAsyncImageContent()
-                        } else {
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
+                GameArtwork(item, Modifier.fillMaxSize())
+                if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) {
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
@@ -1965,12 +1939,7 @@ private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: Pa
                     ) {
                         Column(Modifier.fillMaxSize()) {
                             Box(Modifier.fillMaxWidth().height(156.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                                if (game.image != null) SubcomposeAsyncImage(
-                                    model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-                                ) {
-                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
-                                    else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                } else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                GameArtwork(game, Modifier.fillMaxSize())
                             }
                             Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text(game.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
