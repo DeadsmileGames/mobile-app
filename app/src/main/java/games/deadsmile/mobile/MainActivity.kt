@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -1214,7 +1215,11 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var avatarUrlInput by rememberSaveable { mutableStateOf("") }
     var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val avatarPrefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
-    var localAvatarPath by rememberSaveable { mutableStateOf(avatarPrefs.getString("local_avatar_path", null)) }
+    val avatarPreferenceKey = remember(state.user?.email, state.user?.username) {
+        "local_avatar_path_" + (state.user?.email.orEmpty().ifBlank { state.user?.username.orEmpty() }.lowercase(java.util.Locale.ROOT).hashCode())
+    }
+    var localAvatarPath by rememberSaveable(avatarPreferenceKey) { mutableStateOf(avatarPrefs.getString(avatarPreferenceKey, null)) }
+    var localAvatarUpload by remember { mutableStateOf("") }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -1222,8 +1227,13 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
         if (saved == null) avatarPickerMessage = "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP."
         else {
             localAvatarPath = saved.absolutePath
-            avatarPrefs.edit().putString("local_avatar_path", saved.absolutePath).apply()
-            avatarPickerMessage = "Foto aplicada neste dispositivo. Não precisa salvar o perfil."
+            avatarPrefs.edit().putString(avatarPreferenceKey, saved.absolutePath).apply()
+            localAvatarUpload = runCatching { encodeProfileImage(context, Uri.fromFile(saved)) }.getOrNull().orEmpty()
+            avatarPickerMessage = if (localAvatarUpload.isNotBlank()) {
+                "Foto aplicada neste dispositivo. Salve o perfil para sincronizar a imagem da conta."
+            } else {
+                "Foto aplicada neste dispositivo. A imagem ficará salva localmente."
+            }
         }
     }
     var showEmailForm by rememberSaveable { mutableStateOf(false) }
@@ -1289,7 +1299,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 AccountAvatar(Uri.fromFile(File(localAvatarPath!!)).toString(), Modifier.size(54.dp))
                                 Text("Foto salva neste dispositivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                TextButton(onClick = { File(localAvatarPath!!).delete(); localAvatarPath = null; avatarPrefs.edit().remove("local_avatar_path").apply(); avatarPickerMessage = "Foto local removida." }) { Text("Remover") }
+                                TextButton(onClick = { File(localAvatarPath!!).delete(); localAvatarPath = null; avatarPrefs.edit().remove(avatarPreferenceKey).apply(); localAvatarUpload = ""; avatarUrl = ""; avatarUrlInput = ""; avatarPickerMessage = "Foto removida."; vm.saveProfile(username, profileBio, websiteUrl, location, "") }, enabled = !state.busy) { Text("Remover") }
                             }
                         }
                         if (avatarUrl.startsWith("data:image/")) {
@@ -1301,7 +1311,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
-                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrlInput); editingProfile = false },
+                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, localAvatarUpload.ifBlank { avatarUrlInput }); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
@@ -1593,19 +1603,42 @@ private fun decodeProfileImage(value: String?): Bitmap? {
     return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
 }
 
-private fun copyProfileImage(context: Context, uri: Uri): File? {
+private fun decodeProfileBitmap(context: Context, uri: Uri, maxDimension: Int): Bitmap? {
     val resolver = context.contentResolver
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        return runCatching {
+            val source = ImageDecoder.createSource(resolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
+                val longest = maxOf(info.size.width, info.size.height)
+                decoder.setTargetSampleSize((longest / maxDimension).coerceAtLeast(1))
+            }
+        }.getOrNull()
+    }
+
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     var sample = 1
-    while (bounds.outWidth / sample > 1024 || bounds.outHeight / sample > 1024) sample *= 2
+    while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension) sample *= 2
     val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
-    val scaled = if (decoded.width > 768 || decoded.height > 768) {
-        val ratio = minOf(768f / decoded.width, 768f / decoded.height)
-        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
-    } else decoded
+    return runCatching { resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } }.getOrNull()
+}
+
+private fun scaleProfileBitmap(decoded: Bitmap, maxDimension: Int): Bitmap {
+    if (decoded.width <= maxDimension && decoded.height <= maxDimension) return decoded
+    val ratio = minOf(maxDimension.toFloat() / decoded.width, maxDimension.toFloat() / decoded.height)
+    return Bitmap.createScaledBitmap(
+        decoded,
+        (decoded.width * ratio).toInt().coerceAtLeast(1),
+        (decoded.height * ratio).toInt().coerceAtLeast(1),
+        true
+    )
+}
+
+private fun copyProfileImage(context: Context, uri: Uri): File? {
+    val decoded = decodeProfileBitmap(context, uri, 1024) ?: return null
+    val scaled = scaleProfileBitmap(decoded, 768)
     val destination = File(context.filesDir, "profile-avatar.jpg")
     val ok = runCatching { destination.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) } }.getOrDefault(false)
     if (scaled !== decoded) scaled.recycle()
@@ -1614,18 +1647,8 @@ private fun copyProfileImage(context: Context, uri: Uri): File? {
 }
 
 private fun encodeProfileImage(context: Context, uri: Uri): String? {
-    val resolver = context.contentResolver
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sampleSize = 1
-    while (bounds.outWidth / sampleSize > 640 || bounds.outHeight / sampleSize > 640) sampleSize *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
-    val scaled = if (decoded.width > 512 || decoded.height > 512) {
-        val ratio = minOf(512f / decoded.width, 512f / decoded.height)
-        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
-    } else decoded
+    val decoded = decodeProfileBitmap(context, uri, 640) ?: return null
+    val scaled = scaleProfileBitmap(decoded, 512)
     val stream = ByteArrayOutputStream()
     var quality = 84
     do {
