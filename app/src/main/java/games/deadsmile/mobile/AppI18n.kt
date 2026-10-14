@@ -109,7 +109,7 @@ object AppI18n {
         "A solicitação não foi autorizada." to "The request was not authorized.",
         "Muitas tentativas. Aguarde." to "Too many attempts. Please wait.",
         "Não foi possível concluir a solicitação." to "Could not complete the request.",
-        "A API retornou uma resposta inválida." to "The API returned an invalid response."
+        "A API retornou uma resposta inválida." to "The API returned an invalid response.",
         "Deadsmile Games Companion" to "Deadsmile Games Companion",
         "DEADSMILE GAMES COMPANION" to "DEADSMILE GAMES COMPANION",
         "Últimas notícias" to "Latest news",
@@ -231,7 +231,7 @@ object AppI18n {
         "Bom ter você de volta" to "Qué bueno verte de nuevo", "Criar conta" to "Crear cuenta",
         "Entrar" to "Iniciar sesión", "Já tenho uma conta" to "Ya tengo una cuenta",
         "Criar uma conta" to "Crear una cuenta", "Disponível no PC" to "Disponible en PC",
-        "Desenvolvido por " to "Desarrollado por ", "Publicado por " to "Publicado por "
+        "Desenvolvido por " to "Desarrollado por ", "Publicado por " to "Publicado por ",
         "Deadsmile Games Companion" to "Deadsmile Games Companion",
         "DEADSMILE GAMES COMPANION" to "DEADSMILE GAMES COMPANION",
         "Últimas notícias" to "Últimas noticias",
