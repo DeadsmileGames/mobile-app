@@ -4,8 +4,8 @@ import android.content.Context
 import java.util.Locale
 
 /**
- * Central translation layer for application-owned UI copy.
- * Text received from the API remains as authored when no translation is available.
+ * Central translation layer for app-owned copy.
+ * Unrecognized editorial/game copy remains as returned by the database or GitHub.
  */
 object AppI18n {
     private val english = mapOf(
@@ -235,6 +235,46 @@ object AppI18n {
         "Lançamento previsto em " to "Release expected in ",
         "Anunciado. Lançamento previsto em " to "Announced. Release expected in ",
         "Plataformas: " to "Platforms: ",
+        "Newswire" to "Newswire",
+        "Atualizações" to "Updates",
+        "Versão instalada: " to "Installed version: ",
+        "Atualização automática disponível apenas na versão de distribuição assinada." to "Automatic updates are available only in the signed distribution build.",
+        "Verificando as releases do GitHub…" to "Checking GitHub releases…",
+        "Ainda não há releases publicadas para o Companion." to "No Companion releases have been published yet.",
+        "Histórico público de versões e arquivos disponibilizados pelo projeto." to "Public history of versions and project assets.",
+        "Baixando versão " to "Downloading version ",
+        "Atualizar histórico" to "Refresh release history",
+        "Carregando releases do GitHub…" to "Loading GitHub releases…",
+        "Nenhuma release publicada" to "No release published",
+        "Quando uma versão oficial for publicada no repositório, ela aparecerá aqui com data, notas e APK." to "When an official version is published in the repository, it will appear here with a date, notes, and APK.",
+        "Pré-lançamento" to "Pre-release",
+        "Esta release não inclui um APK instalável." to "This release does not include an installable APK.",
+        "Instalar atualização" to "Install update",
+        "Build de distribuição necessária" to "Signed distribution build required",
+        "Ver release" to "View release",
+        "Atualização pronta" to "Update ready",
+        "O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android." to "The APK has downloaded. To continue, allow Companion to request installation of this version in Android settings.",
+        "Abrir configurações" to "Open settings",
+        "Agora não" to "Not now",
+        "Não foi possível abrir o instalador." to "Could not open the installer.",
+        "Não foi possível carregar as releases do GitHub." to "Could not load GitHub releases.",
+        "Não foi possível baixar ou preparar a atualização." to "Could not download or prepare the update.",
+        "A instalação automática exige a versão de distribuição assinada." to "Automatic installation requires the signed distribution build.",
+        "Bem-vindo ao Deadsmile Games Companion" to "Welcome to Deadsmile Games Companion",
+        "Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela." to "Explore the main areas of Companion. The tour will highlight each tab and explain what you can find there.",
+        "Começar tour" to "Start tour",
+        "Pular por enquanto" to "Skip for now",
+        "Toque na aba destacada na barra inferior para continuar." to "Tap the highlighted tab in the bottom navigation to continue.",
+        "Pular tour" to "Skip tour",
+        "Obrigado por conhecer o Companion!" to "Thanks for taking a tour of Companion!",
+        "Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos." to "You reached your account area. Sign in to sync your library and wishlist.",
+        "Concluir e acessar a conta" to "Finish and go to account",
+        "Página inicial" to "Home",
+        "Parabéns! Você conheceu a página inicial." to "Great! You have seen the home page.",
+        "Parabéns! Você encontrou a área de newswire." to "Great! You found the newswire area.",
+        "Parabéns! Você encontrou os vídeos." to "Great! You found the videos.",
+        "Parabéns! Você encontrou sua biblioteca." to "Great! You found your library.",
+        "Parabéns! Você chegou à conta e ao login." to "Great! You reached account and sign-in.",
     )
 
     private val spanish = mapOf(
@@ -464,10 +504,50 @@ object AppI18n {
         "Lançamento previsto em " to "Lanzamiento previsto en ",
         "Anunciado. Lançamento previsto em " to "Anunciado. Lanzamiento previsto en ",
         "Plataformas: " to "Plataformas: ",
+        "Newswire" to "Newswire",
+        "Atualizações" to "Actualizaciones",
+        "Versão instalada: " to "Versión instalada: ",
+        "Atualização automática disponível apenas na versão de distribuição assinada." to "Las actualizaciones automáticas solo están disponibles en la versión de distribución firmada.",
+        "Verificando as releases do GitHub…" to "Comprobando las releases de GitHub…",
+        "Ainda não há releases publicadas para o Companion." to "Aún no se han publicado releases de Companion.",
+        "Histórico público de versões e arquivos disponibilizados pelo projeto." to "Historial público de versiones y archivos publicados por el proyecto.",
+        "Baixando versão " to "Descargando versión ",
+        "Atualizar histórico" to "Actualizar historial",
+        "Carregando releases do GitHub…" to "Cargando releases de GitHub…",
+        "Nenhuma release publicada" to "No hay releases publicadas",
+        "Quando uma versão oficial for publicada no repositório, ela aparecerá aqui com data, notas e APK." to "Cuando se publique una versión oficial en el repositorio, aparecerá aquí con fecha, notas y APK.",
+        "Pré-lançamento" to "Versión preliminar",
+        "Esta release não inclui um APK instalável." to "Esta release no incluye un APK instalable.",
+        "Instalar atualização" to "Instalar actualización",
+        "Build de distribuição necessária" to "Se necesita la compilación firmada",
+        "Ver release" to "Ver release",
+        "Atualização pronta" to "Actualización lista",
+        "O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android." to "El APK se ha descargado. Para continuar, permite que Companion solicite la instalación de esta versión en los ajustes de Android.",
+        "Abrir configurações" to "Abrir ajustes",
+        "Agora não" to "Ahora no",
+        "Não foi possível abrir o instalador." to "No se pudo abrir el instalador.",
+        "Não foi possível carregar as releases do GitHub." to "No se pudieron cargar las releases de GitHub.",
+        "Não foi possível baixar ou preparar a atualização." to "No se pudo descargar o preparar la actualización.",
+        "A instalação automática exige a versão de distribuição assinada." to "La instalación automática requiere la versión de distribución firmada.",
+        "Bem-vindo ao Deadsmile Games Companion" to "Te damos la bienvenida a Deadsmile Games Companion",
+        "Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela." to "Conoce las áreas principales de Companion. El recorrido resaltará cada pestaña y explicará qué encontrarás allí.",
+        "Começar tour" to "Empezar recorrido",
+        "Pular por enquanto" to "Omitir por ahora",
+        "Toque na aba destacada na barra inferior para continuar." to "Toca la pestaña resaltada en la barra inferior para continuar.",
+        "Pular tour" to "Omitir recorrido",
+        "Obrigado por conhecer o Companion!" to "¡Gracias por conocer Companion!",
+        "Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos." to "Has llegado al área de cuenta. Inicia sesión para sincronizar tu biblioteca y lista de deseos.",
+        "Concluir e acessar a conta" to "Terminar e ir a la cuenta",
+        "Página inicial" to "Inicio",
+        "Parabéns! Você conheceu a página inicial." to "¡Bien! Has conocido la página de inicio.",
+        "Parabéns! Você encontrou a área de newswire." to "¡Bien! Has encontrado la sección de newswire.",
+        "Parabéns! Você encontrou os vídeos." to "¡Bien! Has encontrado los vídeos.",
+        "Parabéns! Você encontrou sua biblioteca." to "¡Bien! Has encontrado tu biblioteca.",
+        "Parabéns! Você chegou à conta e ao login." to "¡Bien! Has llegado a cuenta e inicio de sesión.",
     )
 
     fun translate(context: Context, value: String): String {
-        val language = runCatching { context.resources.configuration.locales.get(0)?.language }.getOrNull()
+        val language = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
             ?: Locale.getDefault().language
         return translate(language, value)
     }
@@ -493,6 +573,10 @@ object AppI18n {
                 table.getValue("Plataformas: ") + value.removePrefix("Plataformas: ")
             value.startsWith("Captura de tela de ") ->
                 table.getValue("Captura de tela de ") + value.removePrefix("Captura de tela de ")
+            value.startsWith("Versão instalada: ") ->
+                table.getValue("Versão instalada: ") + value.removePrefix("Versão instalada: ")
+            value.startsWith("Baixando versão ") ->
+                table.getValue("Baixando versão ") + value.removePrefix("Baixando versão ")
             else -> value
         }
     }
