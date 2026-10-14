@@ -36,11 +36,17 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         createChannel(context)
         val api = ApiClient(context)
         pollPlatformEvents(context, api, preferences)
-        val streams = listOf(
-            Stream("news", "Novidade na Deadsmile") { api.get("/newswire?limit=24&offset=0").feed("items", "news") },
-            Stream("videos", "Novo vídeo") { api.get("/videos?limit=24&offset=0").feed("items", "videos") },
-            Stream("games", "Novo jogo no catálogo") { api.get("/games?page=1&limit=48").feed("items", "games") }
-        )
+        val streams = buildList {
+            if (preferences.getBoolean("notify_news", true)) {
+                add(Stream("news", "Notícia nova na Deadsmile") { api.get("/newswire?limit=24&offset=0").feed("items", "news") })
+            }
+            if (preferences.getBoolean("notify_videos", true)) {
+                add(Stream("videos", "Novo vídeo") { api.get("/videos?limit=24&offset=0").feed("items", "videos") })
+            }
+            if (preferences.getBoolean("notify_games", true)) {
+                add(Stream("games", "Novo jogo no catálogo") { api.get("/games?page=1&limit=48").feed("items", "games") })
+            }
+        }
         var succeeded = 0
         var failures = 0
         for (stream in streams) {
@@ -94,6 +100,13 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
             if (establishBaseline) return
             newEvents.forEach { event ->
                 val type = event.optString("event_type").ifBlank { event.optString("type") }
+                val prefKey = when {
+                    type.startsWith("game.", ignoreCase = true) -> "notify_games"
+                    type.startsWith("news.", ignoreCase = true) -> "notify_news"
+                    type.startsWith("video.", ignoreCase = true) -> "notify_videos"
+                    else -> "notify_platform"
+                }
+                if (!preferences.getBoolean(prefKey, true)) return@forEach
                 val notification = eventNotification(type, event) ?: return@forEach
                 sendNotification(
                     context,
@@ -123,6 +136,7 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
             "game.updated", "game.version.updated" -> "Jogo atualizado"
             "game.deleted" -> "Alteração no catálogo"
             "news.updated", "news.published" -> "Notícia nova na Deadsmile"
+            "video.updated", "video.published" -> "Novo vídeo na Deadsmile"
             "news.deleted" -> "Atualização de notícias"
             "launcher.updated", "launcher.released" -> "Launcher Deadsmile atualizado"
             "achievement.unlocked", "platform.achievement.unlocked" -> "Conquista desbloqueada"
