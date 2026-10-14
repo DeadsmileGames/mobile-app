@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -56,7 +59,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     api.get("/videos?limit=24&offset=" + offset).feed("items", "videos")
                 } }
                 val totalPages = initial.third?.optJSONObject("pagination")
-                    ?.optInt("totalPages", 1)?.coerceIn(1, 100) ?: 1
+                    ?.optInt("totalPages", 1)?.coerceIn(1, 999) ?: 1
                 val games = async { completePagedGames(initialGames, totalPages) { page ->
                     api.get("/games?page=" + page + "&limit=48").feed("items", "games")
                 } }
@@ -92,13 +95,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         fetch: suspend (page: Int) -> List<FeedItem>
     ): List<FeedItem> {
         if (totalPages <= 1) return first
-        val collected = first.toMutableList()
-        for (page in 2..totalPages) {
-            val batch = runCatching { fetch(page) }.getOrDefault(emptyList())
-            if (batch.isEmpty()) break
-            collected.addAll(batch)
+        val gate = Semaphore(4)
+        val remaining = coroutineScope {
+            (2..totalPages).map { page ->
+                async {
+                    gate.withPermit { runCatching { fetch(page) }.getOrDefault(emptyList()) }
+                }
+            }.awaitAll()
         }
-        return collected.distinctBy { it.id }
+        return (first + remaining.flatten()).distinctBy { it.id }
     }
     fun loadDetails(item: FeedItem, isGame: Boolean) = viewModelScope.launch {
         mutable.value = mutable.value.copy(detail = item, detailLoading = true)
