@@ -88,9 +88,9 @@ The Android APK workflow verifies the shared UI/localization contracts, runs uni
 
 ## Signed release process
 
-A semantic version tag such as `v1.1.0` triggers [Release Android](https://github.com/DeadsmileGames/mobile-app/actions/workflows/release-android.yml). The workflow runs the static audit and unit tests, builds both distribution variants, checks the package ID and target API, verifies the signatures, confirms that only the direct APK contains the package-install permission, then uploads the APK, AAB, and checksum file to a GitHub Release.
+A semantic version tag such as `v1.1.0` triggers [Release Android](https://github.com/DeadsmileGames/mobile-app/actions/workflows/release-android.yml). For the first `v1.1.0` release, the same workflow also runs after the dedicated release PR is merged and creates the tag at that tested merge commit. The workflow runs the static audit and unit tests, builds both distribution variants, checks the package ID and target API, verifies the signatures, confirms that only the direct APK contains the package-install permission, then uploads the APK, AAB, and checksum file to a GitHub Release.
 
-Configure these GitHub Actions secrets before creating the release tag:
+Configure these GitHub Actions secrets before merging the release PR or creating the release tag:
 
 - `ANDROID_RELEASE_KEYSTORE_BASE64` — release/upload keystore encoded as Base64.
 - `ANDROID_RELEASE_STORE_PASSWORD` — keystore password.
