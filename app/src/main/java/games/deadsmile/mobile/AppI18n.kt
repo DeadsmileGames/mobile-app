@@ -156,7 +156,7 @@ object AppI18n {
         "Launcher Deadsmile atualizado" to "Deadsmile launcher updated",
         "Conquista desbloqueada" to "Achievement unlocked",
         "Lista de desejos atualizada" to "Wishlist updated",
-        "Abra Deadsmile Games para ver os detalhes." to "Open Deadsmile Games Companion for details."
+        "Abra Deadsmile Games para ver os detalhes." to "Open Deadsmile Games Companion for details.",
         "Catálogo de jogos" to "Game catalog",
         "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "There is no content to show right now. Check your connection and try again.",
         "Limpar busca" to "Clear search",
@@ -273,7 +273,7 @@ object AppI18n {
         "Launcher Deadsmile atualizado" to "Launcher de Deadsmile actualizado",
         "Conquista desbloqueada" to "Logro desbloqueado",
         "Lista de desejos atualizada" to "Lista de deseos actualizada",
-        "Abra Deadsmile Games para ver os detalhes." to "Abre Deadsmile Games Companion para ver los detalles."
+        "Abra Deadsmile Games para ver os detalhes." to "Abre Deadsmile Games Companion para ver los detalles.",
         "Catálogo de jogos" to "Catálogo de juegos",
         "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "No hay contenido para mostrar ahora. Comprueba tu conexión e inténtalo de nuevo.",
         "Limpar busca" to "Borrar búsqueda",
