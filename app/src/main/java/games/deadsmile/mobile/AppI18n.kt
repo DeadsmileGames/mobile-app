@@ -222,6 +222,7 @@ object AppI18n {
         "Permite exibir suas conquistas no perfil." to "Allows achievements to appear on your profile.",
         "Confirme que é você" to "Confirm it's you",
         "Foto do perfil" to "Profile picture",
+        "Captura de tela de " to "Screenshot of ",
         "Novo jogo no catálogo" to "New game in the catalog",
         "Novos jogos, notícias e vídeos." to "New games, news and videos.",
         "Destaque" to "Featured",
@@ -450,6 +451,7 @@ object AppI18n {
         "Permite exibir suas conquistas no perfil." to "Permite mostrar tus logros en el perfil.",
         "Confirme que é você" to "Confirma que eres tú",
         "Foto do perfil" to "Foto de perfil",
+        "Captura de tela de " to "Captura de pantalla de ",
         "Novo jogo no catálogo" to "Nuevo juego en el catálogo",
         "Novos jogos, notícias e vídeos." to "Juegos nuevos, noticias y vídeos.",
         "Destaque" to "Destacado",
@@ -489,6 +491,8 @@ object AppI18n {
                 table.getValue("Data prevista: ") + value.removePrefix("Data prevista: ")
             value.startsWith("Plataformas: ") ->
                 table.getValue("Plataformas: ") + value.removePrefix("Plataformas: ")
+            value.startsWith("Captura de tela de ") ->
+                table.getValue("Captura de tela de ") + value.removePrefix("Captura de tela de ")
             else -> value
         }
     }
