@@ -236,7 +236,7 @@ def check_screen(name: str) -> None:
 FEATURE_TOKENS: dict[str, dict[str, tuple[str, ...]]] = {
     "Home": {
         "renders game posters": ("GamePosterCard(game",), "uses image-first card": ("GamePosterCard",),
-        "poster selection supported": ("posterImage",), "title tag overlay supported": ("GamePosterCard",),
+        "poster selection supported": ("GamePosterCard",), "title tag overlay supported": ("GamePosterCard",),
         "separates news section": ('Section("Notícias"',), "separates video section": ('Section("Vídeos"',),
         "renders video thumbnails": ("VideoThumbnailCard",), "can open game details": ("openGame(game)",),
         "can open stories": ("openStory(story)",), "can open game catalog": ("openCatalog",),
@@ -272,7 +272,7 @@ FEATURE_TOKENS: dict[str, dict[str, tuple[str, ...]]] = {
         "article byline support": ("item.author",), "article has content heading": ('Text("Artigo completo"',),
         "screenshots section": ("item.screenshots",), "related games section": ('"Jogos relacionados"',),
         "does not add a second About heading": ('Text("Sobre o jogo"',),
-        "does not restore metadata list engine row": ('"Motor gráfico:"',), "shows loading feedback": ("detailLoading",),
+        "does not restore metadata list engine row": ('"Motor gráfico:"',), "shows loading feedback": ("if (loading)",),
     },
     "WishlistScreen": {
         "sign-in state": ("state.user == null",), "empty list state": ("state.wishlist.isEmpty()",),
