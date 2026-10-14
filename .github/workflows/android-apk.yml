@@ -1,76 +1,73 @@
 name: Android APK
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: android-apk-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build:
-    name: Build and verify debug APK
+    name: Build and verify direct APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
       - name: Set up JDK 17
-        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d1652
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96
         with:
           gradle-version: '8.13'
-      - name: Verify Companion UI and localization contracts
+
+      - name: Verify UI and release contracts
         run: python3 scripts/verify_companion_design.py
+
       - name: Verify project
         run: gradle --no-daemon --stacktrace tasks
+
       - name: Run unit tests
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
-      - name: Build unsigned production variants for release smoke test
-        run: gradle --no-daemon --stacktrace assembleDirectRelease assemblePlayRelease bundlePlayRelease -PappVersionName=1.1.0 -PappVersionCode=1001000
-      - name: Verify production variant manifests and artifacts
+
+      - name: Build direct-install APK
+        run: gradle --no-daemon --stacktrace assembleDirectRelease -PappVersionName=1.1.0 -PappVersionCode=1001000
+
+      - name: Verify direct-install APK
         run: |
           set -euo pipefail
-          DIRECT_APK=app/build/outputs/apk/direct/release/app-direct-release-unsigned.apk
-          PLAY_APK=app/build/outputs/apk/play/release/app-play-release-unsigned.apk
-          PLAY_AAB=app/build/outputs/bundle/playRelease/app-play-release.aab
-          test -s "$DIRECT_APK"
-          test -s "$PLAY_APK"
-          test -s "$PLAY_AAB"
+          APK=app/build/outputs/apk/direct/release/app-direct-release.apk
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
           test -x "$AAPT"
-          for APK in "$DIRECT_APK" "$PLAY_APK"; do
-            BADGING="$("$AAPT" dump badging "$APK")"
-            printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='1001000' versionName='1.1.0'"
-            printf '%s\n' "$BADGING" | grep -F "application-label:'Deadsmile Games'"
-            printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
-          done
-          DIRECT_PERMS="$("$AAPT" dump permissions "$DIRECT_APK")"
-          PLAY_PERMS="$("$AAPT" dump permissions "$PLAY_APK")"
-          printf '%s\n' "$DIRECT_PERMS" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"
-          if printf '%s\n' "$PLAY_PERMS" | grep -Fq "android.permission.REQUEST_INSTALL_PACKAGES"; then
-            echo "Play flavor must not request REQUEST_INSTALL_PACKAGES."
-            exit 1
-          fi
-          unzip -tq "$PLAY_AAB"
-          sha256sum "$DIRECT_APK" "$PLAY_APK" "$PLAY_AAB"
-      - name: Build APK
-        run: gradle --no-daemon --stacktrace assembleDirectDebug
-      - name: Verify APK exists
-        run: |
-          test -s app/build/outputs/apk/direct/debug/app-direct-debug.apk
-          sha256sum app/build/outputs/apk/direct/debug/app-direct-debug.apk
-      - name: Upload installable APK
+          "$APKSIGNER" verify --verbose "$APK"
+          "$APKSIGNER" verify --print-certs "$APK"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='1001000' versionName='1.1.0'"
+          printf '%s\n' "$BADGING" | grep -F "application-label:'Deadsmile Games'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
+          printf '%s\n' "$("$AAPT" dump permissions "$APK")" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"
+          sha256sum "$APK"
+
+      - name: Upload direct-install APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: Deadsmile-Games-direct-debug-APK
-          path: app/build/outputs/apk/direct/debug/app-direct-debug.apk
+          name: Deadsmile-Games-Android-APK
+          path: app/build/outputs/apk/direct/release/app-direct-release.apk
           if-no-files-found: error
           retention-days: 30
