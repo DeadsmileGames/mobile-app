@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import games.deadsmile.mobile.MainActivity
+import games.deadsmile.mobile.AppI18n
 import games.deadsmile.mobile.R
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
@@ -155,8 +156,8 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
 
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Novidades Deadsmile", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Novos jogos, notícias e vídeos."
+            val channel = NotificationChannel(CHANNEL_ID, AppI18n.translate(context, "Novidades do catálogo"), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = AppI18n.translate(context, "Novos jogos, notícias e vídeos.")
                 enableLights(true)
                 lightColor = Color.rgb(129, 115, 255)
             }
@@ -171,11 +172,13 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         val pendingIntent = PendingIntent.getActivity(
             context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val localizedTitle = AppI18n.translate(context, title)
+        val localizedMessage = AppI18n.translate(context, message)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_deadsmile)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setContentTitle(localizedTitle)
+            .setContentText(localizedMessage)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(localizedMessage))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setColor(Color.rgb(129, 115, 255))
