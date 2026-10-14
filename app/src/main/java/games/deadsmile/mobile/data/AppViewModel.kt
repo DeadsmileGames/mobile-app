@@ -59,10 +59,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // quietly in the background so the mobile UI is never held behind pagination.
         val all = withContext(Dispatchers.IO) {
             coroutineScope {
-                val news = async { completeOffsetFeed(initialNews, 24) { offset ->
+                val newsPages = initial.first?.optJSONObject("pagination")
+                    ?.optInt("totalPages", if (initialNews.size >= 24) 40 else 1)?.coerceIn(1, 400)
+                    ?: if (initialNews.size >= 24) 40 else 1
+                val videoPages = initial.second?.optJSONObject("pagination")
+                    ?.optInt("totalPages", if (initialVideos.size >= 24) 40 else 1)?.coerceIn(1, 400)
+                    ?: if (initialVideos.size >= 24) 40 else 1
+                val news = async { completeOffsetFeed(initialNews, 24, newsPages) { offset ->
                     api.get("/newswire?limit=24&offset=" + offset).feed("items", "news")
                 } }
-                val videos = async { completeOffsetFeed(initialVideos, 24) { offset ->
+                val videos = async { completeOffsetFeed(initialVideos, 24, videoPages) { offset ->
                     api.get("/videos?limit=24&offset=" + offset).feed("items", "videos")
                 } }
                 val totalPages = initial.third?.optJSONObject("pagination")
@@ -80,20 +86,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun completeOffsetFeed(
         first: List<FeedItem>,
         pageSize: Int,
+        totalPages: Int,
         fetch: suspend (offset: Int) -> List<FeedItem>
     ): List<FeedItem> {
-        val collected = first.toMutableList()
-        var offset = first.size
-        var pages = 1
-        while (first.size >= pageSize && pages < 40) {
-            val page = runCatching { fetch(offset) }.getOrDefault(emptyList())
-            if (page.isEmpty()) break
-            collected.addAll(page)
-            offset += page.size
-            pages++
-            if (page.size < pageSize) break
+        if (totalPages <= 1) return first
+        val gate = Semaphore(4)
+        val remaining = coroutineScope {
+            (1 until totalPages).map { page ->
+                async {
+                    gate.withPermit {
+                        runCatching { fetch(page * pageSize) }.getOrDefault(emptyList())
+                    }
+                }
+            }.awaitAll()
         }
-        return collected.distinctBy { it.id }
+        return (first + remaining.flatten()).distinctBy { it.id }.take(10_000)
     }
 
     private suspend fun completePagedGames(
