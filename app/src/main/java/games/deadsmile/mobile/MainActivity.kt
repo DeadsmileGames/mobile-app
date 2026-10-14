@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideogameAsset
@@ -391,12 +393,25 @@ private fun Section(title: String, action: String, onClick: () -> Unit) {
 
 @Composable
 private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
+    var query by rememberSaveable(title) { mutableStateOf("") }
+    val searchable = title == "Catálogo de jogos" || title == "Últimas notícias" || title == "Vídeos"
+    val filtered = remember(content, query) {
+        val term = query.trim()
+        if (term.isBlank()) content else content.filter {
+            it.title.contains(term, ignoreCase = true) ||
+                it.summary.contains(term, ignoreCase = true) ||
+                it.body.contains(term, ignoreCase = true) ||
+                it.genres.any { genre -> genre.contains(term, ignoreCase = true) }
+        }
+    }
     if (loading && content.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
     if (content.isEmpty()) {
-        Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) { Empty("Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente.") }
+        Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) {
+            Empty("Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente.")
+        }
         return
     }
     LazyColumn(
@@ -405,7 +420,26 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        items(content, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth()) { open(item) } }
+        if (searchable) item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(if (title == "Catálogo de jogos") "Buscar jogos" else "Buscar conteúdo") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
+                    }
+                }
+            )
+        }
+        if (filtered.isEmpty()) {
+            item { Empty("Nenhum resultado para essa busca. Tente outro termo.") }
+        } else {
+            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth()) { open(item) } }
+        }
     }
 }
 
