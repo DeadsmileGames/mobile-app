@@ -157,6 +157,28 @@ object AppI18n {
         "Conquista desbloqueada" to "Achievement unlocked",
         "Lista de desejos atualizada" to "Wishlist updated",
         "Abra Deadsmile Games para ver os detalhes." to "Open Deadsmile Games Companion for details."
+        "Catálogo de jogos" to "Game catalog",
+        "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "There is no content to show right now. Check your connection and try again.",
+        "Limpar busca" to "Clear search",
+        "Nenhum resultado para essa busca. Tente outro termo." to "No results for this search. Try another term.",
+        "Remover da lista de desejos" to "Remove from wishlist",
+        "Adicionar à lista de desejos" to "Add to wishlist",
+        "Carregando sua biblioteca…" to "Loading your library…",
+        "Sua biblioteca está vazia ou ainda não foi carregada." to "Your library is empty or has not loaded yet.",
+        "Nenhuma outra sessão encontrada." to "No other sessions found.",
+        "Dispositivo conectado" to "Connected device",
+        "Ativada para sua conta" to "Enabled for your account",
+        "Adicione uma camada extra de proteção à conta." to "Add another layer of protection to your account.",
+        "Compartilhar atividade de jogos" to "Share game activity",
+        "Permite mostrar sua atividade no perfil." to "Allows game activity to appear on your profile.",
+        "Mostrar tempo de jogo" to "Show playtime",
+        "Exibe seu tempo de jogo no perfil público." to "Shows your playtime on your public profile.",
+        "Compartilhar conquistas" to "Share achievements",
+        "Permite exibir suas conquistas no perfil." to "Allows achievements to appear on your profile.",
+        "Confirme que é você" to "Confirm it's you",
+        "Foto do perfil" to "Profile picture",
+        "Novo jogo no catálogo" to "New game in the catalog",
+        "Novos jogos, notícias e vídeos." to "New games, news and videos."
     )
 
     private val spanish = mapOf(
@@ -252,6 +274,28 @@ object AppI18n {
         "Conquista desbloqueada" to "Logro desbloqueado",
         "Lista de desejos atualizada" to "Lista de deseos actualizada",
         "Abra Deadsmile Games para ver os detalhes." to "Abre Deadsmile Games Companion para ver los detalles."
+        "Catálogo de jogos" to "Catálogo de juegos",
+        "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "No hay contenido para mostrar ahora. Comprueba tu conexión e inténtalo de nuevo.",
+        "Limpar busca" to "Borrar búsqueda",
+        "Nenhum resultado para essa busca. Tente outro termo." to "No hay resultados para esta búsqueda. Prueba otro término.",
+        "Remover da lista de desejos" to "Quitar de la lista de deseos",
+        "Adicionar à lista de desejos" to "Añadir a la lista de deseos",
+        "Carregando sua biblioteca…" to "Cargando tu biblioteca…",
+        "Sua biblioteca está vazia ou ainda não foi carregada." to "Tu biblioteca está vacía o aún no se ha cargado.",
+        "Nenhuma outra sessão encontrada." to "No se encontraron otras sesiones.",
+        "Dispositivo conectado" to "Dispositivo conectado",
+        "Ativada para sua conta" to "Activada en tu cuenta",
+        "Adicione uma camada extra de proteção à conta." to "Añade una capa extra de protección a tu cuenta.",
+        "Compartilhar atividade de jogos" to "Compartir actividad de juegos",
+        "Permite mostrar sua atividade no perfil." to "Permite mostrar tu actividad en el perfil.",
+        "Mostrar tempo de jogo" to "Mostrar tiempo de juego",
+        "Exibe seu tempo de jogo no perfil público." to "Muestra tu tiempo de juego en el perfil público.",
+        "Compartilhar conquistas" to "Compartir logros",
+        "Permite exibir suas conquistas no perfil." to "Permite mostrar tus logros en el perfil.",
+        "Confirme que é você" to "Confirma que eres tú",
+        "Foto do perfil" to "Foto de perfil",
+        "Novo jogo no catálogo" to "Nuevo juego en el catálogo",
+        "Novos jogos, notícias e vídeos." to "Juegos nuevos, noticias y vídeos."
     )
 
     fun translate(context: Context, value: String): String {
