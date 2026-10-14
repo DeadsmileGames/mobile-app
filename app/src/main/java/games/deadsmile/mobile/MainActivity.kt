@@ -938,6 +938,10 @@ private fun GameDetailsScreen(
                         item.publisher.takeIf { it.isNotBlank() }?.let { "Publicado por $it" },
                         item.genres.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Gêneros: $it" },
                         "Classificação indicativa: $rating",
+                        item.ratingSystem.takeIf { it.isNotBlank() }?.let { "Sistema de classificação: $it" },
+                        item.ratingDescription.takeIf { it.isNotBlank() }?.let { "Descrição da classificação: $it" },
+                        item.ratingDescriptors.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Descritores de conteúdo: $it" },
+                        item.ratingDisclaimers.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Avisos de conteúdo: $it" },
                         item.engine.takeIf { it.isNotBlank() }?.let { "Motor gráfico: $it" },
                         item.version.takeIf { it.isNotBlank() }?.let { "Versão: $it" },
                         "Salvamento na nuvem: " + if (item.cloudSavesEnabled) "Habilitado" else "Não habilitado",
@@ -950,6 +954,14 @@ private fun GameDetailsScreen(
                     if (meta.isNotEmpty()) {
                         Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                             Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                item.ratingImageUrl?.let { ratingImage ->
+                                    AsyncImage(
+                                        model = ratingImage,
+                                        contentDescription = AppI18n.translate(LocalContext.current, "Selo de classificação indicativa"),
+                                        modifier = Modifier.size(width = 88.dp, height = 52.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
                                 meta.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
                             }
                         }

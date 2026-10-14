@@ -47,6 +47,12 @@ object AppI18n {
         "Ver opções de compra" to "View purchase options",
         "Sobre o jogo" to "About the game",
         "Classificação indicativa: " to "Age rating: ",
+        "Sistema de classificação: " to "Rating system: ",
+        "Descrição da classificação: " to "Rating details: ",
+        "Descritores de conteúdo: " to "Content descriptors: ",
+        "Avisos de conteúdo: " to "Content advisories: ",
+        "Selo de classificação indicativa" to "Age rating badge",
+
         "Não informada pela plataforma" to "Not provided by the platform",
         "Motor gráfico: " to "Game engine: ",
         "Versão: " to "Version: ",
@@ -419,6 +425,12 @@ object AppI18n {
         "Ver opções de compra" to "Ver opciones de compra",
         "Sobre o jogo" to "Sobre el juego",
         "Classificação indicativa: " to "Clasificación por edad: ",
+        "Sistema de classificação: " to "Sistema de clasificación: ",
+        "Descrição da classificação: " to "Detalles de la clasificación: ",
+        "Descritores de conteúdo: " to "Descriptores de contenido: ",
+        "Avisos de conteúdo: " to "Avisos de contenido: ",
+        "Selo de classificação indicativa" to "Etiqueta de clasificación por edad",
+
         "Não informada pela plataforma" to "No informado por la plataforma",
         "Motor gráfico: " to "Motor del juego: ",
         "Versão: " to "Versión: ",
@@ -671,6 +683,14 @@ object AppI18n {
                 table.getValue("Plataformas: ") + value.removePrefix("Plataformas: ")
             value.startsWith("Classificação indicativa: ") ->
                 table.getValue("Classificação indicativa: ") + value.removePrefix("Classificação indicativa: ")
+            value.startsWith("Sistema de classificação: ") ->
+                table.getValue("Sistema de classificação: ") + value.removePrefix("Sistema de classificação: ")
+            value.startsWith("Descrição da classificação: ") ->
+                table.getValue("Descrição da classificação: ") + value.removePrefix("Descrição da classificação: ")
+            value.startsWith("Descritores de conteúdo: ") ->
+                table.getValue("Descritores de conteúdo: ") + value.removePrefix("Descritores de conteúdo: ")
+            value.startsWith("Avisos de conteúdo: ") ->
+                table.getValue("Avisos de conteúdo: ") + value.removePrefix("Avisos de conteúdo: ")
             value.startsWith("Motor gráfico: ") ->
                 table.getValue("Motor gráfico: ") + value.removePrefix("Motor gráfico: ")
             value.startsWith("Versão: ") ->
