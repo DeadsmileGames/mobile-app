@@ -630,13 +630,13 @@ private fun GameDetailsScreen(
                     }
                     GameAvailabilityCard(item)
                     Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Visitar site oficial") }
-                    if (item.microsoftStoreUrl != null) {
-                        OutlinedButton(onClick = { onOpenExternal(item.microsoftStoreUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir Microsoft Store") }
+                    item.microsoftStoreUrl?.let { storeUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(storeUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir Microsoft Store") }
                     }
-                    if (item.itchUrl != null) {
-                        OutlinedButton(onClick = { onOpenExternal(item.itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver página no itch.io") }
-                    } else if (item.purchaseUrl != null) {
-                        OutlinedButton(onClick = { onOpenExternal(item.purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver opções de compra") }
+                    item.itchUrl?.let { itchUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver página no itch.io") }
+                    } ?: item.purchaseUrl?.let { purchaseUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver opções de compra") }
                     }
                     OutlinedButton(onClick = onToggleWishlist, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
                         Icon(if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null)
