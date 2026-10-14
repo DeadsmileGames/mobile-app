@@ -88,7 +88,6 @@ private fun JSONObject.firstText(vararg names: String): String {
     return ""
 }
 
-/** Resolves images the same way as the desktop launcher, and accepts API-served relative paths too. */
 fun resolveAssetUrl(value: String?): String? {
     val raw = value?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
     if (raw.startsWith("//") || raw.any { it.isISOControl() } || raw.contains('\\')) return null
@@ -156,7 +155,6 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         "coverImage", "cover_image", "image", "thumbnail", "thumbnail_url", "thumbnailUrl",
         "heroImage", "hero_image", "bannerImage", "banner_image", "poster", "cover", "icon"
     )) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
-        // Official artwork fallback from the game's current itch.io listing; never substitute another game's art.
         "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
     } else null
     val rawBody = o.firstText(
@@ -319,8 +317,6 @@ fun JSONObject.feed(vararg keys: String): List<FeedItem> {
 }
 
 fun JSONObject.detailItem(fallback: FeedItem, preferGame: Boolean? = null): FeedItem {
-    // The response may include a related "game" next to an "article". Prefer the entity
-    // implied by the requested endpoint, rather than treating the related game as the article.
     val detail = when (preferGame) {
         true -> optJSONObject("game") ?: optJSONObject("item") ?: this
         false -> optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
@@ -377,7 +373,6 @@ fun JSONObject.userAccount(): UserAccount? {
     if (id.isBlank() || username.isBlank()) return null
     return UserAccount(id, username, optString("email"), optString("bio"))
 }
-
 
 fun JSONObject.accountProfile(fallback: AccountProfile = AccountProfile()): AccountProfile = AccountProfile(
     fullName = firstText("fullName", "full_name").ifBlank { fallback.fullName },
