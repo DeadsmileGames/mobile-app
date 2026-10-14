@@ -1808,7 +1808,7 @@ private fun SettingsScreen(
     onOpenUpdates: () -> Unit
 ) {
     var languageMenuExpanded by rememberSaveable { mutableStateOf(false) }
-    val selectedLanguageLabel = when (appLanguage) { "en" -> "English"; "es" -> "Español"; else -> "Português (Brasil)" }
+    val selectedLanguageLabel = when (appLanguage) { "pt-BR" -> "Português (Brasil)"; "en" -> "English"; "es" -> "Español"; else -> AppI18n.translate(LocalContext.current, "Escolha seu idioma") }
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
