@@ -1512,8 +1512,6 @@ private fun SettingsScreen(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
-    accentPalette: Int,
-    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit
 ) {
@@ -1546,24 +1544,6 @@ private fun SettingsScreen(
                         checked = dynamicColors,
                         onCheckedChange = onDynamicColors
                     )
-                    Text("Cor de destaque", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    val swatches = listOf(
-                        Triple("Violeta", Color(0xFF5B4BCC), Color(0xFFB8AEFF)),
-                        Triple("Rosa", Color(0xFFB4234F), Color(0xFFFF9DB0)),
-                        Triple("Verde-água", Color(0xFF176B65), Color(0xFF8AD8CF)),
-                        Triple("Azul", Color(0xFF2458B8), Color(0xFF9CBFFF))
-                    )
-                    swatches.forEachIndexed { index, palette ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onAccentPalette(index) }.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            RadioButton(selected = accentPalette == index && !dynamicColors, onClick = { onAccentPalette(index) })
-                            Box(Modifier.size(26.dp).clip(CircleShape).background(if (themeMode == 2) palette.third else palette.second))
-                            Text(palette.first, Modifier.weight(1f))
-                        }
-                    }
                 }
             }
         }
