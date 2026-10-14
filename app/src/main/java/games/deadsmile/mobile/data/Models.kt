@@ -28,6 +28,29 @@ data class FeedItem(
 
 data class UserAccount(val id: String, val username: String, val email: String, val bio: String)
 
+data class AccountProfile(
+    val fullName: String = "",
+    val username: String = "",
+    val email: String = "",
+    val bio: String = "",
+    val websiteUrl: String = "",
+    val location: String = "",
+    val avatarUrl: String = ""
+)
+
+data class PrivacyOptions(
+    val shareGameActivity: Boolean = false,
+    val sharePlaytime: Boolean = false,
+    val shareAchievements: Boolean = false
+)
+
+data class ActiveSession(
+    val id: String,
+    val client: String,
+    val platform: String,
+    val isCurrent: Boolean
+)
+
 private fun JSONObject.firstText(vararg names: String): String {
     names.forEach { name ->
         val value = opt(name)
@@ -175,4 +198,38 @@ fun JSONObject.userAccount(): UserAccount? {
     val username = optString("username")
     if (id.isBlank() || username.isBlank()) return null
     return UserAccount(id, username, optString("email"), optString("bio"))
+}
+
+
+fun JSONObject.accountProfile(fallback: AccountProfile = AccountProfile()): AccountProfile = AccountProfile(
+    fullName = firstText("fullName", "full_name").ifBlank { fallback.fullName },
+    username = firstText("username").ifBlank { fallback.username },
+    email = firstText("email").ifBlank { fallback.email },
+    bio = firstText("bio").ifBlank { fallback.bio },
+    websiteUrl = firstText("websiteUrl", "website_url").ifBlank { fallback.websiteUrl },
+    location = firstText("location").ifBlank { fallback.location },
+    avatarUrl = resolveAssetUrl(firstText("avatarUrl", "avatar_url")).orEmpty().ifBlank { fallback.avatarUrl }
+)
+
+fun JSONObject.privacyOptions(): PrivacyOptions = PrivacyOptions(
+    shareGameActivity = optBoolean("shareGameActivity", false),
+    sharePlaytime = optBoolean("sharePlaytime", false),
+    shareAchievements = optBoolean("shareAchievements", false)
+)
+
+fun JSONObject.activeSessions(): List<ActiveSession> {
+    val sessions = optJSONArray("sessions") ?: optJSONArray("items") ?: JSONArray()
+    return buildList {
+        for (i in 0 until sessions.length()) {
+            val entry = sessions.optJSONObject(i) ?: continue
+            val id = entry.firstText("id", "deviceId")
+            if (id.isBlank()) continue
+            add(ActiveSession(
+                id = id,
+                client = entry.firstText("client"),
+                platform = entry.firstText("platform"),
+                isCurrent = entry.optBoolean("isCurrent", false)
+            ))
+        }
+    }
 }
