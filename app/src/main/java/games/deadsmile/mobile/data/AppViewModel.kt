@@ -87,5 +87,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(user = null, library = emptyList(), busy = false, twoFactor = false, message = "Você saiu da conta.")
     }
     fun dismiss() { mutable.value = mutable.value.copy(message = null, error = null) }
-    private fun safe(e: Exception) = if (e is ApiFailure) e.message.take(240) else "Não foi possível conectar. Verifique sua internet e tente novamente."
+    private fun safe(e: Exception): String {
+        if (e !is ApiFailure) return "Não foi possível conectar. Confira sua internet e tente novamente."
+        return when (e.status) {
+            400 -> "Confira os dados informados e tente novamente."
+            401 -> "E-mail ou senha não conferem."
+            403 -> "Não foi possível autorizar esta ação. Confira sua conta e tente novamente."
+            404 -> "Este recurso não está disponível no momento."
+            409 -> "Esses dados já estão em uso. Confira as informações."
+            422 -> "Algumas informações precisam ser corrigidas."
+            429 -> "Muitas tentativas em sequência. Aguarde um pouco e tente novamente."
+            in 500..599 -> "O serviço está indisponível agora. Tente novamente mais tarde."
+            else -> "Não foi possível concluir agora. Tente novamente."
+        }
+    }
 }
