@@ -632,7 +632,7 @@ private fun DeadsmileRoot(
                     else -> "Navegação"
                 },
                 description = when (target) {
-                    Page.HOME -> "Aqui você encontra o resumo do Companion e o carrossel de jogos."
+                    Page.HOME -> "Aqui você encontra o resumo de Deadsmile Games e o carrossel de jogos."
                     Page.NEWS -> "Esta aba mostra as publicações e notícias carregadas da plataforma."
                     Page.VIDEOS -> "Aqui ficam os vídeos publicados e seus links oficiais."
                     Page.LIBRARY -> "A biblioteca exibe os jogos da sua conta para PC, sem instalar jogos no Android."
@@ -655,7 +655,7 @@ private fun DeadsmileRoot(
         AlertDialog(
             onDismissRequest = { showInstallPermissionDialog = false },
             title = { Text("Atualização pronta") },
-            text = { Text("O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android.") },
+            text = { Text("O APK foi baixado. Para continuar, permita que Deadsmile Games solicite a instalação desta versão nas configurações do Android.") },
             confirmButton = {
                 TextButton(onClick = {
                     showInstallPermissionDialog = false
@@ -675,7 +675,7 @@ private fun TourWelcomeOverlay(onStart: () -> Unit, onSkip: () -> Unit) {
         Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Bem-vindo ao Deadsmile Games", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Conheça as áreas principais de Deadsmile Games. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Começar tour") }
                 TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Pular por enquanto") }
             }
