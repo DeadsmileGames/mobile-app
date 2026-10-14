@@ -33,7 +33,15 @@ data class FeedItem(
     val downloadAvailable: Boolean = false,
     val launcherAvailable: Boolean = false,
     val featured: Boolean = false,
-    val platforms: List<String> = emptyList()
+    val platforms: List<String> = emptyList(),
+    val ageRating: String = "",
+    val engine: String = "",
+    val version: String = "",
+    val trailerUrl: String? = null,
+    val savePathTemplate: String = "",
+    val cloudSavesEnabled: Boolean = false,
+    val supportedLanguages: List<String> = emptyList(),
+    val features: List<String> = emptyList()
 )
 
 data class UserAccount(val id: String, val username: String, val email: String, val bio: String)
@@ -120,6 +128,7 @@ private fun JSONArray.strings(): List<String> = buildList {
 
 private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Boolean): FeedItem {
     val title = o.firstText("title", "name", "gameTitle", "game_title").ifBlank { "Sem título" }
+    val storeInfo = o.optJSONObject("microsoftStore") ?: o.optJSONObject("microsoftStoreBadge")
     val slug = o.firstText("slug", "newsSlug", "gameSlug")
     val id = o.firstText("id", "uuid", "gameId", "game_id").ifBlank { slug.ifBlank { fallbackId } }
     val image = resolveAssetUrl(o.firstText(
@@ -134,8 +143,15 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         "article_body", "fullDescription", "full_description", "description", "excerpt"
     )
     val summary = displayHtml(o.firstText(
-        "excerpt", "summary", "shortDescription", "short_description", "subtitle", "tagline", "description"
-    )).ifBlank { displayHtml(rawBody).take(220) }
+        "excerpt", "summary", "shortDescription", "short_description", "subtitle", "tagline",
+        "caption", "synopsis", "videoDescription", "video_description", "description"
+    )).ifBlank {
+        val localized = o.optJSONObject("translations")?.let { translations ->
+            (translations.optJSONObject("pt-BR") ?: translations.optJSONObject("pt") ?: translations.optJSONObject("en"))
+                ?.firstText("excerpt", "summary", "description")
+        }.orEmpty()
+        displayHtml(localized).ifBlank { displayHtml(rawBody).take(220) }
+    }
     val url = o.firstText("video_url", "videoUrl", "externalUrl", "external_url", "url")
         .takeIf { it.startsWith("https://", ignoreCase = true) }
     val purchaseUrl = o.firstText("purchaseUrl", "purchase_url").takeIf { it.startsWith("https://", ignoreCase = true) }
@@ -189,7 +205,17 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         downloadAvailable = o.optBoolean("downloadAvailable", false),
         launcherAvailable = o.optBoolean("launcherAvailable", o.optBoolean("downloadAvailable", false)),
         featured = o.optBoolean("featured", false),
-        platforms = (o.optJSONArray("platforms") ?: JSONArray()).strings()
+        platforms = (o.optJSONArray("platforms") ?: JSONArray()).strings(),
+        ageRating = o.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age")
+            .ifBlank { storeInfo?.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age").orEmpty() },
+        engine = o.firstText("engine", "gameEngine", "game_engine"),
+        version = o.firstText("version", "gameVersion", "game_version"),
+        trailerUrl = o.firstText("trailerUrl", "trailer_url", "trailer", "backgroundVideo", "background_video")
+            .takeIf { it.startsWith("https://", ignoreCase = true) },
+        savePathTemplate = o.firstText("savePathTemplate", "save_path_template"),
+        cloudSavesEnabled = o.optBoolean("cloudSavesEnabled", o.optBoolean("cloud_saves_enabled", false)),
+        supportedLanguages = (o.optJSONArray("supportedLanguages") ?: o.optJSONArray("supported_languages") ?: o.optJSONArray("languages") ?: JSONArray()).strings(),
+        features = (o.optJSONArray("features") ?: o.optJSONArray("gameModes") ?: o.optJSONArray("game_modes") ?: JSONArray()).strings()
     )
 }
 
@@ -238,7 +264,15 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         downloadAvailable = if (detail.has("downloadAvailable")) parsed.downloadAvailable else fallback.downloadAvailable,
         launcherAvailable = if (detail.has("launcherAvailable")) parsed.launcherAvailable else fallback.launcherAvailable,
         featured = if (detail.has("featured")) parsed.featured else fallback.featured,
-        platforms = parsed.platforms.ifEmpty { fallback.platforms }
+        platforms = parsed.platforms.ifEmpty { fallback.platforms },
+        ageRating = parsed.ageRating.ifBlank { fallback.ageRating },
+        engine = parsed.engine.ifBlank { fallback.engine },
+        version = parsed.version.ifBlank { fallback.version },
+        trailerUrl = parsed.trailerUrl ?: fallback.trailerUrl,
+        savePathTemplate = parsed.savePathTemplate.ifBlank { fallback.savePathTemplate },
+        cloudSavesEnabled = if (detail.has("cloudSavesEnabled") || detail.has("cloud_saves_enabled")) parsed.cloudSavesEnabled else fallback.cloudSavesEnabled,
+        supportedLanguages = parsed.supportedLanguages.ifEmpty { fallback.supportedLanguages },
+        features = parsed.features.ifEmpty { fallback.features }
     )
 }
 

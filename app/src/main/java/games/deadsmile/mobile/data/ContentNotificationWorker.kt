@@ -114,7 +114,15 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
             if (caughtUp) preferences.edit().putBoolean("notification_event_initialized", true).apply()
             // Do not notify about historical events while the first baseline catches up.
             if (establishBaseline || !caughtUp) return
+            val deliveredByLiveSocket = runCatching {
+                val saved = JSONArray(preferences.getString("realtime_notified_ids", "[]"))
+                buildSet {
+                    for (index in 0 until saved.length()) saved.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }.getOrDefault(emptySet())
             newEvents.forEach { event ->
+                // Foreground WebSocket delivery already showed these events. Do not duplicate them here.
+                if (event.optString("id").takeIf { it.isNotBlank() } in deliveredByLiveSocket) return@forEach
                 val type = event.optString("event_type").ifBlank { event.optString("type") }
                 val prefKey = when {
                     type.startsWith("game.", ignoreCase = true) -> "notify_games"
