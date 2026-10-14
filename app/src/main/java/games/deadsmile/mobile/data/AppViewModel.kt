@@ -17,7 +17,7 @@ import org.json.JSONObject
 
 data class UiState(
     val news: List<FeedItem> = emptyList(), val videos: List<FeedItem> = emptyList(),
-    val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(),
+    val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(), val wishlist: List<FeedItem> = emptyList(),
     val user: UserAccount? = null, val loading: Boolean = true, val busy: Boolean = false,
     val twoFactor: Boolean = false, val message: String? = null, val error: String? = null,
     val detail: FeedItem? = null, val detailLoading: Boolean = false,
@@ -137,6 +137,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(user = user)
         if (user != null) {
             library()
+            loadWishlist()
             loadAccountSettings()
         } else {
             mutable.value = mutable.value.copy(accountProfile = null, sessions = emptyList(), privacy = PrivacyOptions(), accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "")
@@ -264,6 +265,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         finally { mutable.value = mutable.value.copy(busy = false) }
     }
 
+    fun loadWishlist() = viewModelScope.launch {
+        if (mutable.value.user == null) {
+            mutable.value = mutable.value.copy(wishlist = emptyList())
+            return@launch
+        }
+        val list = withContext(Dispatchers.IO) {
+            runCatching { api.get("/wishlist").feed("items", "wishlist", "games") }.getOrDefault(emptyList())
+        }
+        mutable.value = mutable.value.copy(wishlist = list)
+    }
+
+    fun toggleWishlist(item: FeedItem) = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        if (mutable.value.user == null) {
+            mutable.value = mutable.value.copy(message = "Entre na conta para usar sua lista de desejos.")
+            return@launch
+        }
+        val id = item.id
+        if (!id.matches(Regex("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"))) {
+            mutable.value = mutable.value.copy(error = "Não foi possível identificar este jogo para sua lista de desejos.")
+            return@launch
+        }
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            val inWishlist = mutable.value.wishlist.any { it.id.equals(id, ignoreCase = true) }
+            withContext(Dispatchers.IO) {
+                if (inWishlist) api.delete("/wishlist/" + id)
+                else api.post("/wishlist", JSONObject().put("gameId", id))
+            }
+            mutable.value = mutable.value.copy(
+                wishlist = if (inWishlist) mutable.value.wishlist.filterNot { it.id.equals(id, true) }
+                    else (mutable.value.wishlist + item).distinctBy { it.id },
+                message = if (inWishlist) "Jogo removido da lista de desejos." else "Jogo adicionado à lista de desejos."
+            )
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun removeWishlist(id: String) = viewModelScope.launch {
+        if (mutable.value.busy || mutable.value.user == null) return@launch
+        if (!id.matches(Regex("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"))) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            withContext(Dispatchers.IO) { api.delete("/wishlist/" + id) }
+            mutable.value = mutable.value.copy(wishlist = mutable.value.wishlist.filterNot { it.id.equals(id, true) }, message = "Jogo removido da lista de desejos.")
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
     fun library() = viewModelScope.launch {
         if (mutable.value.user == null) return@launch
         val list = withContext(Dispatchers.IO) { runCatching { api.get("/library").feed("items", "games", "library") }.getOrDefault(emptyList()) }
@@ -309,7 +359,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(busy = true)
         try { withContext(Dispatchers.IO) { api.post("/auth/logout", JSONObject()) } } catch (_: Exception) { }
         withContext(Dispatchers.IO) { api.clearSession() }
-        mutable.value = mutable.value.copy(user = null, accountProfile = null, library = emptyList(), sessions = emptyList(), busy = false, twoFactor = false, accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "", message = "Você saiu da conta.")
+        mutable.value = mutable.value.copy(user = null, accountProfile = null, library = emptyList(), wishlist = emptyList(), sessions = emptyList(), busy = false, twoFactor = false, accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "", message = "Você saiu da conta.")
     }
     fun dismiss() { mutable.value = mutable.value.copy(message = null, error = null) }
     private fun safe(e: Exception): String {
