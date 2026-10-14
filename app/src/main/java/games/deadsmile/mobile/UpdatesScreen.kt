@@ -81,7 +81,7 @@ fun UpdatesScreen(
                 Text(
                     when {
                         !allowInstall -> "Atualização automática disponível apenas na versão de distribuição assinada."
-                        releasesLoading -> "Verificando as releases do GitHub…"
+                        loading -> "Verificando as releases do GitHub…"
                         releases.isEmpty() -> "Ainda não há releases publicadas para o Companion."
                         else -> "Histórico público de versões e arquivos disponibilizados pelo projeto."
                     },
