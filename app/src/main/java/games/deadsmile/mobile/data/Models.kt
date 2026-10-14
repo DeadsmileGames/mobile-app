@@ -152,6 +152,7 @@ fun JSONObject.feed(vararg keys: String): List<FeedItem> {
 fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
     val detail = optJSONObject("game") ?: optJSONObject("article") ?: optJSONObject("news") ?: optJSONObject("item") ?: this
     val parsed = itemFromJson(detail, fallback.id, true)
+    val rootRelated = if (detail !== this) itemFromJson(this, fallback.id, true).relatedGames else emptyList()
     return parsed.copy(
         id = parsed.id.ifBlank { fallback.id },
         title = parsed.title.ifBlank { fallback.title },
@@ -165,7 +166,7 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         publishedAt = parsed.publishedAt.ifBlank { fallback.publishedAt },
         genres = parsed.genres.ifEmpty { fallback.genres },
         screenshots = parsed.screenshots.ifEmpty { fallback.screenshots },
-        relatedGames = parsed.relatedGames.ifEmpty { fallback.relatedGames }
+        relatedGames = parsed.relatedGames.ifEmpty { rootRelated.ifEmpty { fallback.relatedGames } }
     )
 }
 
