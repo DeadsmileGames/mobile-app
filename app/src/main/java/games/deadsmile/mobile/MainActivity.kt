@@ -31,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -585,46 +586,201 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) 
     var username by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var registerMode by rememberSaveable { mutableStateOf(false) }
-    var editing by rememberSaveable { mutableStateOf(false) }
+
+    var fullName by rememberSaveable { mutableStateOf("") }
+    var profileBio by rememberSaveable { mutableStateOf("") }
+    var websiteUrl by rememberSaveable { mutableStateOf("") }
+    var location by rememberSaveable { mutableStateOf("") }
+    var avatarUrl by rememberSaveable { mutableStateOf("") }
+    var editingProfile by rememberSaveable { mutableStateOf(false) }
+    var showEmailForm by rememberSaveable { mutableStateOf(false) }
+    var newEmail by rememberSaveable { mutableStateOf("") }
+    var currentPassword by rememberSaveable { mutableStateOf("") }
+    var totpToken by rememberSaveable { mutableStateOf("") }
+    var confirmDisableTwoFactor by rememberSaveable { mutableStateOf(false) }
+    var shareActivity by rememberSaveable { mutableStateOf(false) }
+    var sharePlaytime by rememberSaveable { mutableStateOf(false) }
+    var shareAchievements by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(state.accountProfile) {
+        state.accountProfile?.let { profile ->
+            fullName = profile.fullName
+            username = profile.username
+            profileBio = profile.bio
+            websiteUrl = profile.websiteUrl
+            location = profile.location
+            avatarUrl = profile.avatarUrl
+        }
+    }
+    LaunchedEffect(state.privacy) {
+        shareActivity = state.privacy.shareGameActivity
+        sharePlaytime = state.privacy.sharePlaytime
+        shareAchievements = state.privacy.shareAchievements
+    }
 
     if (state.user != null) {
-        LaunchedEffect(state.user.username) { username = state.user.username }
+        val profile = state.accountProfile
         Column(
-            Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(15.dp)
         ) {
             Card(shape = RoundedCornerShape(26.dp)) {
-                Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(
-                        Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) { Icon(Icons.Default.AccountCircle, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                    Text(state.user.username, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(state.user.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    HorizontalDivider()
-                    Text("Dados da conta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (editing) {
-                        OutlinedTextField(username, { username = it }, label = { Text("Nome de usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.user.bio, {}, label = { Text("Biografia") }, enabled = false, modifier = Modifier.fillMaxWidth(), supportingText = { Text("A edição da biografia ainda não está disponível.") })
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (!profile?.avatarUrl.isNullOrBlank()) {
+                            AsyncImage(profile?.avatarUrl, contentDescription = "Foto do perfil", Modifier.size(68.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                        } else {
+                            Box(Modifier.size(68.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.AccountCircle, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(profile?.fullName?.ifBlank { state.user.username } ?: state.user.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("@" + (profile?.username?.ifBlank { state.user.username } ?: state.user.username), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(profile?.email?.ifBlank { state.user.email } ?: state.user.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (state.accountLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    if (editingProfile) {
+                        HorizontalDivider()
+                        OutlinedTextField(fullName, { fullName = it.take(80) }, label = { Text("Nome de exibição") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(username, { username = it.take(24) }, label = { Text("Nome de usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(location, { location = it.take(120) }, label = { Text("Localização") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(avatarUrl, { avatarUrl = it.take(5000) }, label = { Text("URL da foto (opcional)") }, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
                         Button(
-                            onClick = { vm.rename(username); editing = false },
-                            enabled = !state.busy && username.trim().length in 3..24 && username.trim() != state.user.username,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Salvar alterações") }
-                        TextButton(onClick = { editing = false; username = state.user.username }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
+                            onClick = { vm.saveProfile(fullName, username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
+                            enabled = !state.busy && username.trim().length in 3..24,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
+                        ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
+                        TextButton(onClick = { editingProfile = false; profile?.let { username = it.username; fullName = it.fullName; profileBio = it.bio; websiteUrl = it.websiteUrl; location = it.location; avatarUrl = it.avatarUrl } }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
                     } else {
-                        OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) { Text("Editar perfil") }
-                    }
-                    OutlinedButton(onClick = vm::account, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(8.dp)); Text("Atualizar dados da conta")
-                    }
-                    Button(onClick = vm::logout, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("Sair da conta")
+                        if (profile?.bio?.isNotBlank() == true) Text(profile.bio, style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { editingProfile = true }, modifier = Modifier.weight(1f)) { Text("Editar perfil") }
+                            OutlinedButton(onClick = vm::loadAccountSettings, enabled = !state.accountLoading, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Atualizar")
+                            }
+                        }
                     }
                 }
             }
-            Text("Preferências do app", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Tema, animações e notificações ficam em Configurações, no ícone de engrenagem.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Text("Conta e acesso", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Endereço de e-mail", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(profile?.email?.ifBlank { state.user.email } ?: state.user.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { showEmailForm = !showEmailForm }) { Text(if (showEmailForm) "Fechar" else "Alterar") }
+                    }
+                    if (showEmailForm) {
+                        Text("Vamos enviar um link para confirmar o novo endereço. Seu e-mail atual continuará ativo até a confirmação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(newEmail, { newEmail = it.trim() }, label = { Text("Novo e-mail") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(currentPassword, { currentPassword = it }, label = { Text("Senha atual") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                        Button(
+                            onClick = { vm.changeEmail(newEmail, currentPassword); currentPassword = ""; showEmailForm = false },
+                            enabled = !state.busy && newEmail.contains("@") && currentPassword.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Enviar link de confirmação") }
+                    }
+                    HorizontalDivider()
+                    Text("Sessões ativas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Veja onde sua conta está conectada e encerre sessões que você não reconhece.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.sessions.isEmpty()) {
+                        Text(if (state.accountLoading) "Carregando dispositivos…" else "Nenhuma outra sessão encontrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        state.sessions.forEach { session ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(Icons.Default.AccountCircle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(listOf(session.client, session.platform).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Dispositivo conectado" }, fontWeight = FontWeight.Medium)
+                                    if (session.isCurrent) Text("Sessão atual", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                                }
+                                if (!session.isCurrent) TextButton(onClick = { vm.revokeSession(session.id) }, enabled = !state.busy) { Text("Desconectar") }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text("Segurança", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Verificação em duas etapas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(if (state.accountTwoFactorEnabled) "Ativada para sua conta" else "Adicione uma camada extra de proteção à conta.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (state.accountTwoFactorEnabled) {
+                        OutlinedTextField(totpToken, { totpToken = it.take(10) }, label = { Text("Código do autenticador") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = { confirmDisableTwoFactor = true }, enabled = !state.busy && totpToken.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Desativar verificação em duas etapas") }
+                    } else {
+                        if (state.twoFactorSetupSecret.isBlank()) {
+                            Button(onClick = vm::startTwoFactorSetup, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Configurar verificação em duas etapas") }
+                        } else {
+                            Text("Adicione esta chave manualmente no aplicativo autenticador:", style = MaterialTheme.typography.bodyMedium)
+                            SelectionContainer { Text(state.twoFactorSetupSecret, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                            if (state.twoFactorSetupUri.isNotBlank()) {
+                                Text("URI de configuração", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                SelectionContainer { Text(state.twoFactorSetupUri, style = MaterialTheme.typography.bodySmall) }
+                            }
+                            OutlinedTextField(totpToken, { totpToken = it.take(10) }, label = { Text("Código de seis dígitos") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                            Button(onClick = { vm.confirmTwoFactor(totpToken); totpToken = "" }, enabled = !state.busy && totpToken.length >= 6, modifier = Modifier.fillMaxWidth()) { Text("Confirmar e ativar") }
+                        }
+                    }
+                }
+            }
+
+            Text("Privacidade", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PreferenceSwitch(
+                        title = "Compartilhar atividade de jogos",
+                        subtitle = "Permite mostrar sua atividade no perfil.",
+                        checked = shareActivity,
+                        onCheckedChange = { checked -> shareActivity = checked; if (!checked) sharePlaytime = false }
+                    )
+                    PreferenceSwitch(
+                        title = "Mostrar tempo de jogo",
+                        subtitle = "Exibe seu tempo de jogo no perfil público.",
+                        checked = sharePlaytime,
+                        onCheckedChange = { if (shareActivity) sharePlaytime = it }
+                    )
+                    PreferenceSwitch(
+                        title = "Compartilhar conquistas",
+                        subtitle = "Permite exibir suas conquistas no perfil.",
+                        checked = shareAchievements,
+                        onCheckedChange = { shareAchievements = it }
+                    )
+                    Button(
+                        onClick = { vm.savePrivacy(PrivacyOptions(shareActivity, sharePlaytime, shareAchievements)) },
+                        enabled = !state.busy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Salvar privacidade") }
+                }
+            }
+
+            OutlinedButton(onClick = vm::logout, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("Sair da conta")
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+        if (confirmDisableTwoFactor) {
+            AlertDialog(
+                onDismissRequest = { confirmDisableTwoFactor = false },
+                title = { Text("Desativar verificação em duas etapas?") },
+                text = { Text("Confirme com o código atual do seu autenticador.") },
+                confirmButton = {
+                    TextButton(onClick = { confirmDisableTwoFactor = false; vm.confirmTwoFactor(totpToken, disable = true); totpToken = "" }) { Text("Desativar") }
+                },
+                dismissButton = { TextButton(onClick = { confirmDisableTwoFactor = false }) { Text("Cancelar") } }
+            )
         }
         return
     }
