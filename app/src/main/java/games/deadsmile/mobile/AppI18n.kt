@@ -374,6 +374,13 @@ object AppI18n {
         "O serviço está indisponível agora. Tente novamente mais tarde." to "The service is unavailable right now. Please try again later.",
         "Não foi possível concluir agora. Tente novamente." to "Could not complete this right now. Please try again.",
         "English" to "English",
+        "Perfil atualizado." to "Profile updated.",
+        "Dispositivo desconectado." to "Device disconnected.",
+        "Agora adicione a chave ao seu aplicativo autenticador." to "Now add the key to your authenticator app.",
+        "Entre na conta para usar sua lista de desejos." to "Sign in to use your wishlist.",
+        "Jogo removido da lista de desejos." to "Game removed from wishlist.",
+        "Login realizado." to "Login successful.",
+        "Confira os dados informados e tente novamente." to "Check the information you entered and try again.",
     )
 
     private val spanish = mapOf(
@@ -742,6 +749,13 @@ object AppI18n {
         "Muitas tentativas em sequência. Aguarde um pouco e tente novamente." to "Demasiados intentos seguidos. Espera un momento e inténtalo de nuevo.",
         "O serviço está indisponível agora. Tente novamente mais tarde." to "El servicio no está disponible ahora. Inténtalo de nuevo más tarde.",
         "Não foi possível concluir agora. Tente novamente." to "No se pudo completar ahora. Inténtalo de nuevo.",
+        "Perfil atualizado." to "Perfil actualizado.",
+        "Dispositivo desconectado." to "Dispositivo desconectado.",
+        "Agora adicione a chave ao seu aplicativo autenticador." to "Ahora añade la clave a tu aplicación de autenticación.",
+        "Entre na conta para usar sua lista de desejos." to "Inicia sesión para usar tu lista de deseos.",
+        "Jogo removido da lista de desejos." to "Juego eliminado de la lista de deseos.",
+        "Login realizado." to "Inicio de sesión correcto.",
+        "Confira os dados informados e tente novamente." to "Revisa los datos que has introducido e inténtalo de nuevo.",
     )
 
     fun translate(context: Context, value: String): String {
