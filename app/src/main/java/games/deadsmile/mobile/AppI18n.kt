@@ -3,13 +3,9 @@ package games.deadsmile.mobile
 import android.content.Context
 import java.util.Locale
 
-/**
- * Central translation layer for app-owned copy.
- * Unrecognized editorial/game copy remains as returned by the database or GitHub.
- */
 object AppI18n {
     private val english = mapOf(
-        "Deadsmile" to "Deadsmile Games Companion",
+        "Deadsmile" to "Deadsmile Games",
         "DEADSMILE GAMES" to "DEADSMILE GAMES COMPANION",
         "Início" to "Home",
         "Jogos" to "Games",
@@ -129,7 +125,7 @@ object AppI18n {
         "Eventos da conta" to "Account events",
         "Eventos da plataforma, como conquistas e lista de desejos." to "Platform events such as achievements and wishlist changes.",
         "Sobre" to "About",
-        "Deadsmile Games para Android" to "Deadsmile Games Companion for Android",
+        "Deadsmile Games para Android" to "Deadsmile Games for Android",
         "Sua lista de desejos" to "Your wishlist",
         "Sua lista está vazia" to "Your wishlist is empty",
         "Adicione jogos aos favoritos pela tela de detalhes." to "Add games to your favorites from the details screen.",
@@ -208,7 +204,7 @@ object AppI18n {
         "Muitas tentativas. Aguarde." to "Too many attempts. Please wait.",
         "Não foi possível concluir a solicitação." to "Could not complete the request.",
         "A API retornou uma resposta inválida." to "The API returned an invalid response.",
-        "Deadsmile Games Companion" to "Deadsmile Games Companion",
+        "Deadsmile Games" to "Deadsmile Games",
         "DEADSMILE GAMES COMPANION" to "DEADSMILE GAMES COMPANION",
         "Entrar na conta" to "Sign in",
         "Vamos enviar um link para confirmar o novo endereço. Seu e-mail atual continuará ativo até a confirmação." to "We'll send a link to confirm your new address. Your current email stays active until confirmation.",
@@ -226,7 +222,7 @@ object AppI18n {
         "Launcher Deadsmile atualizado" to "Deadsmile launcher updated",
         "Conquista desbloqueada" to "Achievement unlocked",
         "Lista de desejos atualizada" to "Wishlist updated",
-        "Abra Deadsmile Games para ver os detalhes." to "Open Deadsmile Games Companion for details.",
+        "Abra Deadsmile Games para ver os detalhes." to "Open Deadsmile Games for details.",
         "Catálogo de jogos" to "Game catalog",
         "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "There is no content to show right now. Check your connection and try again.",
         "Limpar busca" to "Clear search",
@@ -285,7 +281,7 @@ object AppI18n {
         "Não foi possível carregar as releases do GitHub." to "Could not load GitHub releases.",
         "Não foi possível baixar ou preparar a atualização." to "Could not download or prepare the update.",
         "A instalação automática exige a versão de distribuição assinada." to "Automatic installation requires the signed distribution build.",
-        "Bem-vindo ao Deadsmile Games Companion" to "Welcome to Deadsmile Games Companion",
+        "Bem-vindo ao Deadsmile Games" to "Welcome to Deadsmile Games",
         "Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela." to "Explore the main areas of Companion. The tour will highlight each tab and explain what you can find there.",
         "Começar tour" to "Start tour",
         "Pular por enquanto" to "Skip for now",
@@ -301,7 +297,7 @@ object AppI18n {
         "Parabéns! Você encontrou sua biblioteca." to "Great! You found your library.",
         "Parabéns! Você chegou à conta e ao login." to "Great! You reached account and sign-in.",
         "Catálogo de jogos, newswire, vídeos e biblioteca para PC." to "Game catalog, newswire, videos and PC library.",
-        "Deadsmile Games Companion for Android" to "Deadsmile Games Companion for Android",
+        "Deadsmile Games for Android" to "Deadsmile Games for Android",
         "Consulte o histórico de versões e os APKs publicados no GitHub." to "View version history and APKs published on GitHub.",
         "Ver histórico de atualizações" to "View update history",
         "Idioma" to "Language",
@@ -446,7 +442,7 @@ object AppI18n {
         "Muitas tentativas. Aguarde." to "Demasiados intentos. Espera un momento.",
         "Não foi possível concluir a solicitação." to "No se pudo completar la solicitud.",
         "A API retornou uma resposta inválida." to "La API devolvió una respuesta no válida.",
-        "Deadsmile" to "Deadsmile Games Companion",
+        "Deadsmile" to "Deadsmile Games",
         "DEADSMILE GAMES" to "DEADSMILE GAMES COMPANION",
         "Início" to "Inicio",
         "Jogos" to "Juegos",
@@ -541,7 +537,7 @@ object AppI18n {
         "Notificações ativadas." to "Notificaciones activadas.",
         "Notificações pausadas." to "Notificaciones pausadas.",
         "Sobre" to "Acerca de",
-        "Deadsmile Games para Android" to "Deadsmile Games Companion para Android",
+        "Deadsmile Games para Android" to "Deadsmile Games para Android",
         "Sua lista está vazia" to "Tu lista está vacía",
         "Sua biblioteca" to "Tu biblioteca",
         "Entre para consultar os jogos associados à sua conta." to "Inicia sesión para ver los juegos asociados a tu cuenta.",
@@ -573,7 +569,7 @@ object AppI18n {
         "Disponível no PC" to "Disponible en PC",
         "Desenvolvido por " to "Desarrollado por ",
         "Publicado por " to "Publicado por ",
-        "Deadsmile Games Companion" to "Deadsmile Games Companion",
+        "Deadsmile Games" to "Deadsmile Games",
         "DEADSMILE GAMES COMPANION" to "DEADSMILE GAMES COMPANION",
         "Entrar na conta" to "Iniciar sesión",
         "Remover" to "Eliminar",
@@ -601,7 +597,7 @@ object AppI18n {
         "Launcher Deadsmile atualizado" to "Launcher de Deadsmile actualizado",
         "Conquista desbloqueada" to "Logro desbloqueado",
         "Lista de desejos atualizada" to "Lista de deseos actualizada",
-        "Abra Deadsmile Games para ver os detalhes." to "Abre Deadsmile Games Companion para ver los detalles.",
+        "Abra Deadsmile Games para ver os detalhes." to "Abre Deadsmile Games para ver los detalles.",
         "Catálogo de jogos" to "Catálogo de juegos",
         "Não há conteúdo para mostrar agora. Confira sua conexão e tente novamente." to "No hay contenido para mostrar ahora. Comprueba tu conexión e inténtalo de nuevo.",
         "Limpar busca" to "Borrar búsqueda",
@@ -660,7 +656,7 @@ object AppI18n {
         "Não foi possível carregar as releases do GitHub." to "No se pudieron cargar las releases de GitHub.",
         "Não foi possível baixar ou preparar a atualização." to "No se pudo descargar o preparar la actualización.",
         "A instalação automática exige a versão de distribuição assinada." to "La instalación automática requiere la versión de distribución firmada.",
-        "Bem-vindo ao Deadsmile Games Companion" to "Te damos la bienvenida a Deadsmile Games Companion",
+        "Bem-vindo ao Deadsmile Games" to "Te damos la bienvenida a Deadsmile Games",
         "Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela." to "Conoce las áreas principales de Companion. El recorrido resaltará cada pestaña y explicará qué encontrarás allí.",
         "Começar tour" to "Empezar recorrido",
         "Pular por enquanto" to "Omitir por ahora",
@@ -676,7 +672,7 @@ object AppI18n {
         "Parabéns! Você encontrou sua biblioteca." to "¡Bien! Has encontrado tu biblioteca.",
         "Parabéns! Você chegou à conta e ao login." to "¡Bien! Has llegado a cuenta e inicio de sesión.",
         "Catálogo de jogos, newswire, vídeos e biblioteca para PC." to "Catálogo de juegos, newswire, vídeos y biblioteca de PC.",
-        "Deadsmile Games Companion for Android" to "Deadsmile Games Companion para Android",
+        "Deadsmile Games for Android" to "Deadsmile Games para Android",
         "Consulte o histórico de versões e os APKs publicados no GitHub." to "Consulta el historial de versiones y los APK publicados en GitHub.",
         "Ver histórico de atualizações" to "Ver historial de actualizaciones",
         "Idioma" to "Idioma",
@@ -762,8 +758,6 @@ object AppI18n {
         val saved = runCatching {
             context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE).getString("app_language", "").orEmpty()
         }.getOrDefault("")
-        // No language is persisted until the user selects one. Portuguese is used only to
-        // render the mandatory language chooser, never to silently configure the app.
         val language = saved.ifBlank { "pt-BR" }
         return translate(language, value)
     }
