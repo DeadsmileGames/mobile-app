@@ -417,14 +417,16 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
-    val heroImage = state.games.firstOrNull { !it.image.isNullOrBlank() }?.image ?: ReferenceArtwork
+    val heroImage = state.games.firstOrNull { it.featured && !it.image.isNullOrBlank() }?.image
+        ?: state.games.firstOrNull { !it.image.isNullOrBlank() }?.image
+        ?: ReferenceArtwork
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Box(Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 340.dp).clip(RoundedCornerShape(28.dp)).background(BrandInk)) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 430.dp).clip(RoundedCornerShape(28.dp)).background(BrandInk)) {
                 SubcomposeAsyncImage(model = heroImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
                     if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
                         Box(Modifier.fillMaxSize().background(BrandInk), contentAlignment = Alignment.Center) {
@@ -439,9 +441,25 @@ private fun Home(
                     }
                     Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("Catálogo oficial, notícias, vídeos e biblioteca da sua conta para PC.", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.88f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = openCatalog) { Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos") }
-                        OutlinedButton(onClick = news, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias") }
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        if (maxWidth < 400.dp) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth()) {
+                                    Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos")
+                                }
+                                OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
+                                    Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias")
+                                }
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Button(onClick = openCatalog) { Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos") }
+                                OutlinedButton(onClick = news, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
+                                    Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -552,6 +570,7 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
             }
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
+                if (item.featured) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(7.dp)) { Text("Destaque", Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer) }
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
                 if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
@@ -698,6 +717,8 @@ private fun GameAvailabilityCard(item: FeedItem) {
     val released = item.status.equals("released", true)
     val inDevelopment = item.status.equals("in_development", true)
     val announced = item.status.equals("announced", true)
+    val availabilityMismatch = if (released) item.launcherAvailable != item.downloadAvailable else item.launcherAvailable || item.downloadAvailable
+    val availableInLauncher = released && item.launcherAvailable && item.downloadAvailable
     Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             Icon(when {
@@ -707,26 +728,32 @@ private fun GameAvailabilityCard(item: FeedItem) {
             }, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(when {
-                    released && item.launcherAvailable -> "Publicado · disponível no launcher para Windows"
+                    released && availabilityMismatch -> "Publicado · disponibilidade divergente"
+                    availableInLauncher -> "Publicado · disponível no launcher para Windows"
                     released -> "Publicado · download ainda não configurado"
+                    availabilityMismatch -> "Verificação de publicação necessária"
                     inDevelopment -> "Em desenvolvimento"
                     announced -> "Jogo anunciado"
                     else -> "Estado do jogo"
                 }, fontWeight = FontWeight.SemiBold)
                 Text(when {
-                    released && item.launcherAvailable -> "O catálogo confirma que o jogo está publicado. Para instalar ou jogar, use o launcher no PC."
+                    released && availabilityMismatch -> "O status de publicação não confere com os indicadores do launcher. Consulte o catálogo oficial antes de considerar o jogo disponível."
+                    availableInLauncher -> "O catálogo confirma que o jogo está publicado. Para instalar ou jogar, use o launcher no PC."
                     released -> "O jogo está marcado como publicado, mas a API não confirma um download configurado. Consulte os canais oficiais."
+                    availabilityMismatch -> "O catálogo indica disponibilidade no launcher, mas o status ainda não confirma lançamento. Confira a página oficial do jogo."
                     inDevelopment && countdown != null -> "Lançamento previsto em $countdown."
                     inDevelopment && item.releaseDate.isNotBlank() && target != null && target <= now -> "A data prevista passou, mas o catálogo ainda marca o jogo como em desenvolvimento."
                     inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
                     inDevelopment -> "Ainda não há uma data de lançamento publicada."
                     announced && countdown != null -> "Anunciado. Lançamento previsto em $countdown."
+                    announced && target != null && target <= now -> "A data prevista passou, mas o catálogo continua marcando o jogo como anunciado."
                     announced && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
                     announced -> "O jogo foi anunciado, mas a data de lançamento ainda não foi divulgada."
                     else -> "Não há dados suficientes para confirmar a disponibilidade deste jogo. Consulte o site oficial."
                 }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (item.accessType.equals("paid", true)) Text("Acesso pago", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 else if (item.accessType.equals("free", true)) Text("Gratuito", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                if (item.platforms.isNotEmpty()) Text("Plataformas: ${item.platforms.joinToString(" · ")}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
