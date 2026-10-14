@@ -78,10 +78,10 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
      * a baseline first; subsequent runs notify about meaningful platform events.
      */
     private fun pollPlatformEvents(context: Context, api: ApiClient, preferences: SharedPreferences) {
-        val savedCursor = preferences.getLong("notification_event_cursor", -1L)
-        val establishBaseline = savedCursor < 0L
-        var cursor = if (establishBaseline) 0L else savedCursor
+        val establishBaseline = !preferences.getBoolean("notification_event_initialized", false)
+        var cursor = preferences.getLong("notification_event_cursor", 0L)
         val newEvents = mutableListOf<JSONObject>()
+        var caughtUp = false
         try {
             for (page in 0 until 10) {
                 val data = api.get("/platform/events?after=" + cursor + "&limit=100")
@@ -94,10 +94,15 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                     cursor = id
                     newEvents.add(JSONObject(event.toString()))
                 }
-                if (items.length() < 100 || cursor == before) break
+                if (items.length() < 100 || cursor == before) {
+                    caughtUp = true
+                    break
+                }
             }
             preferences.edit().putLong("notification_event_cursor", cursor).apply()
-            if (establishBaseline) return
+            if (caughtUp) preferences.edit().putBoolean("notification_event_initialized", true).apply()
+            // Do not notify about historical events while the first baseline catches up.
+            if (establishBaseline || !caughtUp) return
             newEvents.forEach { event ->
                 val type = event.optString("event_type").ifBlank { event.optString("type") }
                 val prefKey = when {
