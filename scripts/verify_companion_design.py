@@ -106,6 +106,13 @@ LOCALIZED_UI_KEYS = (
     "Muitas tentativas em sequência. Aguarde um pouco e tente novamente.",
     "O serviço está indisponível agora. Tente novamente mais tarde.",
     "Não foi possível concluir agora. Tente novamente.",
+    "Perfil atualizado.",
+    "Dispositivo desconectado.",
+    "Agora adicione a chave ao seu aplicativo autenticador.",
+    "Entre na conta para usar sua lista de desejos.",
+    "Jogo removido da lista de desejos.",
+    "Login realizado.",
+    "Confira os dados informados e tente novamente.",
 )
 
 # 25 shared contracts repeated against each screen's dependencies. This makes
