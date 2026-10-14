@@ -344,45 +344,86 @@ private fun DeadsmileRoot(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("Deadsmile Games Companion", fontWeight = FontWeight.Bold)
-                        Text(
-                            when (page) {
-                                Page.HOME -> "Catálogo, notícias e biblioteca de PC"
-                                Page.DETAILS -> "Detalhes do jogo"
-                                else -> page.label
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    if (page == Page.DETAILS) {
+                        MaterialText(
+                            text = detailItem?.title.orEmpty(),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    } else {
+                        val title = when (page) {
+                            Page.HOME -> "Início"
+                            Page.GAMES -> "Catálogo de jogos"
+                            Page.NEWS -> "Newswire"
+                            Page.VIDEOS -> "Vídeos"
+                            Page.LIBRARY -> "Biblioteca"
+                            Page.ACCOUNT -> "Conta"
+                            Page.WISHLIST -> "Lista de desejos"
+                            Page.SETTINGS -> "Configurações"
+                            Page.DETAILS -> "Detalhes"
+                            Page.UPDATES -> "Atualizações"
+                        }
+                        Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
                         IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
-                    if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
-                    IconButton(onClick = {
-                        when (page) {
-                            Page.ACCOUNT -> vm.account()
-                            Page.LIBRARY -> vm.library()
-                            else -> vm.reload()
-                        }
-                    }) { Icon(Icons.Default.Refresh, contentDescription = AppI18n.translate(LocalContext.current, "Atualizar conteúdo")) }
+                    if (tourStage < 0) {
+                        IconButton(onClick = {
+                            when (page) {
+                                Page.ACCOUNT -> vm.account()
+                                Page.LIBRARY -> vm.library()
+                                Page.UPDATES -> refreshReleases()
+                                else -> vm.reload()
+                            }
+                        }) { Icon(Icons.Default.Refresh, contentDescription = AppI18n.translate(LocalContext.current, "Atualizar conteúdo")) }
+                    }
                 }
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
-                FloatingDock(page = page, onSelect = { page = it }, reduceMotion = reduceMotion)
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && tourStage != 6) {
+                val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
+                FloatingDock(
+                    page = page,
+                    tourTarget = tourTarget,
+                    onSelect = { selected ->
+                        when {
+                            tourStage == 0 || tourStage == 6 -> Unit
+                            tourStage in 1..5 -> {
+                                val expected = tourTargets[tourStage - 1]
+                                if (selected == expected) {
+                                    page = selected
+                                    tourStage += 1
+                                    tourFeedback = when (selected) {
+                                        Page.HOME -> "Parabéns! Você conheceu a página inicial."
+                                        Page.NEWS -> "Parabéns! Você encontrou a área de newswire."
+                                        Page.VIDEOS -> "Parabéns! Você encontrou os vídeos."
+                                        Page.LIBRARY -> "Parabéns! Você encontrou sua biblioteca."
+                                        Page.ACCOUNT -> "Parabéns! Você chegou à conta e ao login."
+                                        else -> ""
+                                    }
+                                } else {
+                                    tourFeedback = "Toque na aba destacada para continuar o tour."
+                                }
+                            }
+                            else -> page = selected
+                        }
+                    },
+                    reduceMotion = reduceMotion
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -425,8 +466,21 @@ private fun DeadsmileRoot(
                 Page.SETTINGS -> SettingsScreen(
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
-                    accentPalette = accentPalette, onAccentPalette = onAccentPalette,
-                    reduceMotion = reduceMotion, onReduceMotion = onReduceMotion
+                    reduceMotion = reduceMotion, onReduceMotion = onReduceMotion,
+                    onOpenUpdates = { returnPage = Page.SETTINGS; page = Page.UPDATES }
+                )
+                Page.UPDATES -> UpdatesScreen(
+                    releases = releases,
+                    loading = releasesLoading,
+                    error = releaseError,
+                    installedVersion = BuildConfig.VERSION_NAME,
+                    updateBusyVersion = updateBusyVersion,
+                    updateProgress = updateProgress,
+                    autoUpdateError = autoUpdateError,
+                    allowInstall = BuildConfig.APPLICATION_ID == "games.deadsmile.mobile",
+                    onRefresh = ::refreshReleases,
+                    onInstall = beginUpdateDownload,
+                    onOpenRelease = { url -> openExternal(context, url) }
                 )
                 Page.DETAILS -> detailItem?.let { item ->
                     val displayItem = state.detail?.takeIf {
@@ -447,12 +501,64 @@ private fun DeadsmileRoot(
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
             }
+            }
         }
+        if (tourStage == 0) {
+            TourWelcomeOverlay(
+                onStart = { tourStage = 1 },
+                onSkip = { tourStage = -1; tourComplete = true; preferences.edit().putBoolean("tour_completed", true).apply() }
+            )
+        } else if (tourStage in 1..5) {
+            val target = tourTargets[tourStage - 1]
+            TourStepOverlay(
+                title = when (target) {
+                    Page.HOME -> "Página inicial"
+                    Page.NEWS -> "Newswire"
+                    Page.VIDEOS -> "Vídeos"
+                    Page.LIBRARY -> "Biblioteca"
+                    Page.ACCOUNT -> "Conta"
+                    else -> "Navegação"
+                },
+                description = when (target) {
+                    Page.HOME -> "Aqui você encontra o resumo do Companion e o carrossel de jogos."
+                    Page.NEWS -> "Esta aba mostra as publicações e notícias carregadas da plataforma."
+                    Page.VIDEOS -> "Aqui ficam os vídeos publicados e seus links oficiais."
+                    Page.LIBRARY -> "A biblioteca exibe os jogos da sua conta para PC, sem instalar jogos no Android."
+                    Page.ACCOUNT -> "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos."
+                    else -> ""
+                },
+                onSkip = { tourStage = -1; tourComplete = true; preferences.edit().putBoolean("tour_completed", true).apply() }
+            )
+        } else if (tourStage == 6) {
+            TourThanksOverlay(
+                onFinish = {
+                    tourStage = -1
+                    tourComplete = true
+                    preferences.edit().putBoolean("tour_completed", true).apply()
+                }
+            )
+        }
+    }
+    if (showInstallPermissionDialog && pendingUpdateFile != null) {
+        AlertDialog(
+            onDismissRequest = { showInstallPermissionDialog = false },
+            title = { Text("Atualização pronta") },
+            text = { Text("O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showInstallPermissionDialog = false
+                    installPermissionLauncher.launch(
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.packageName))
+                    )
+                }) { Text("Abrir configurações") }
+            },
+            dismissButton = { TextButton(onClick = { showInstallPermissionDialog = false }) { Text("Agora não") } }
+        )
     }
 }
 
 @Composable
-private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boolean) {
+private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit, reduceMotion: Boolean) {
     val destinations = listOf(
         Triple(Page.HOME, Icons.Default.Home, "Início"),
         Triple(Page.NEWS, Icons.Default.Article, "Notícias"),
