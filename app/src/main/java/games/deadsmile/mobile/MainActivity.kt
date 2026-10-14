@@ -192,7 +192,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
             DeadsmileRoot(
                 vm = vm,
                 themeMode = themeMode,
-                onThemeMode = { themeMode = it; if (it == 3) { dynamicColors = false; prefs.edit().putBoolean("dynamic_colors", false).apply() }; prefs.edit().putInt("theme_mode", it).apply() },
+                onThemeMode = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
                 accentPalette = accentPalette,
