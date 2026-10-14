@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.awaitAll
@@ -14,6 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import java.util.concurrent.TimeUnit
 
 data class UiState(
     val news: List<FeedItem> = emptyList(), val videos: List<FeedItem> = emptyList(),
@@ -36,7 +44,118 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val state = mutable.asStateFlow()
 
     private var reloadGeneration = 0
+    private val realtimeClient = OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+    @Volatile private var realtimeActive = false
+    @Volatile private var realtimeSocket: WebSocket? = null
+    private var reconnectJob: Job? = null
+    private var realtimeRefreshJob: Job? = null
+    @Volatile private var reconnectDelayMs = 1_000L
+
     init { reload(); account() }
+
+    fun connectRealtime() {
+        if (realtimeActive) return
+        realtimeActive = true
+        openRealtimeSocket()
+    }
+
+    fun disconnectRealtime() {
+        realtimeActive = false
+        reconnectJob?.cancel()
+        reconnectJob = null
+        realtimeSocket?.close(1000, "activity stopped")
+        realtimeSocket = null
+    }
+
+    private fun openRealtimeSocket() {
+        if (!realtimeActive || realtimeSocket != null) return
+        val request = Request.Builder()
+            .url("wss://api-ust8.onrender.com/api/live")
+            .header("Origin", "deadsmile-app://launcher")
+            .build()
+        val socket = realtimeClient.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                if (!realtimeActive) { webSocket.close(1000, "activity stopped"); return }
+                realtimeSocket = webSocket
+                reconnectDelayMs = 1_000L
+            }
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                if (realtimeActive) handleRealtimeMessage(text)
+            }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (realtimeSocket === webSocket) realtimeSocket = null
+                scheduleRealtimeReconnect()
+            }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (realtimeSocket === webSocket) realtimeSocket = null
+                scheduleRealtimeReconnect()
+            }
+        })
+        if (realtimeActive) realtimeSocket = socket else socket.cancel()
+    }
+
+    private fun scheduleRealtimeReconnect() {
+        if (!realtimeActive || reconnectJob?.isActive == true) return
+        reconnectJob = viewModelScope.launch {
+            delay(reconnectDelayMs)
+            reconnectDelayMs = (reconnectDelayMs * 2L).coerceAtMost(30_000L)
+            if (realtimeActive && realtimeSocket == null) openRealtimeSocket()
+        }
+    }
+
+    private fun handleRealtimeMessage(raw: String) {
+        val event = runCatching { JSONObject(raw) }.getOrNull() ?: return
+        val type = event.optString("event_type").ifBlank { event.optString("type") }.trim()
+        if (type.isBlank() || type.equals("connected", true)) return
+        RealtimeNotificationDispatcher.dispatch(getApplication(), event)
+        realtimeRefreshJob?.cancel()
+        realtimeRefreshJob = viewModelScope.launch {
+            delay(250L)
+            refreshFirstPages(event, type)
+            if (type.startsWith("wishlist.", true) || type.startsWith("account.", true)) account()
+        }
+    }
+
+    private suspend fun refreshFirstPages(event: JSONObject, type: String) {
+        val responses = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val news = async { runCatching { api.get("/newswire?limit=24&offset=0") }.getOrNull() }
+                val videos = async { runCatching { api.get("/videos?limit=24&offset=0") }.getOrNull() }
+                val games = async { runCatching { api.get("/games?page=1&limit=48") }.getOrNull() }
+                Triple(news.await(), videos.await(), games.await())
+            }
+        }
+        val freshNews = responses.first?.feed("items", "news")
+        val freshVideos = responses.second?.feed("items", "videos")
+        val freshGames = responses.third?.feed("items", "games")
+        val entityId = event.optString("entity_id")
+        val deleted = type.endsWith(".deleted", true)
+        fun mergeFresh(fresh: List<FeedItem>?, existing: List<FeedItem>): List<FeedItem> {
+            val prior = if (deleted && entityId.isNotBlank()) existing.filterNot { it.id.equals(entityId, true) } else existing
+            return if (fresh == null) prior else (fresh + prior).distinctBy { it.id }.take(10_000)
+        }
+        mutable.value = mutable.value.copy(
+            news = mergeFresh(freshNews, mutable.value.news),
+            videos = mergeFresh(freshVideos, mutable.value.videos),
+            games = mergeFresh(freshGames, mutable.value.games)
+        )
+        val detail = mutable.value.detail
+        if (detail != null && (detail.id.equals(entityId, true) || detail.slug.equals(event.optString("slug"), true))) {
+            val matchingGame = type.startsWith("game.", true)
+            loadDetails(detail, matchingGame)
+        }
+    }
+
+    override fun onCleared() {
+        disconnectRealtime()
+        realtimeRefreshJob?.cancel()
+        super.onCleared()
+    }
 
     fun reload() = viewModelScope.launch {
         val generation = ++reloadGeneration

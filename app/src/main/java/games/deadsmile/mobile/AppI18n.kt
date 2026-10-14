@@ -46,6 +46,25 @@ object AppI18n {
         "Ver página no itch.io" to "View itch.io page",
         "Ver opções de compra" to "View purchase options",
         "Sobre o jogo" to "About the game",
+        "Classificação indicativa: " to "Age rating: ",
+        "Não informada pela plataforma" to "Not provided by the platform",
+        "Motor gráfico: " to "Game engine: ",
+        "Versão: " to "Version: ",
+        "Salvamento na nuvem: " to "Cloud saves: ",
+        "Habilitado" to "Enabled",
+        "Não habilitado" to "Not enabled",
+        "Idiomas suportados: " to "Supported languages: ",
+        "Recursos: " to "Features: ",
+        "Modelo de salvamento: " to "Save path template: ",
+        "Data de lançamento: " to "Release date: ",
+        "Gêneros: " to "Genres: ",
+        "Em destaque" to "Featured",
+        "Prévia dos temas" to "Theme previews",
+        "Abrir vídeo no site de origem" to "Open video on its source site",
+        "Abrir trailer no navegador" to "Open trailer in browser",
+        "Foto salva apenas neste dispositivo; o envio para a conta não está disponível." to "Photo saved on this device only; account photo upload is unavailable.",
+        "Recebe eventos em tempo real enquanto o app está aberto; em segundo plano o Android pode adiar as consultas." to "Receives real-time events while the app is open; Android may defer background checks.",
+        "Nenhuma descrição adicional foi publicada." to "No additional description has been published.",
         "Artigo completo" to "Full article",
         "Capturas de tela" to "Screenshots",
         "Imagens do artigo" to "Article images",
@@ -399,6 +418,25 @@ object AppI18n {
         "Ver página no itch.io" to "Ver página en itch.io",
         "Ver opções de compra" to "Ver opciones de compra",
         "Sobre o jogo" to "Sobre el juego",
+        "Classificação indicativa: " to "Clasificación por edad: ",
+        "Não informada pela plataforma" to "No informado por la plataforma",
+        "Motor gráfico: " to "Motor del juego: ",
+        "Versão: " to "Versión: ",
+        "Salvamento na nuvem: " to "Guardado en la nube: ",
+        "Habilitado" to "Habilitado",
+        "Não habilitado" to "No habilitado",
+        "Idiomas suportados: " to "Idiomas compatibles: ",
+        "Recursos: " to "Funciones: ",
+        "Modelo de salvamento: " to "Plantilla de guardado: ",
+        "Data de lançamento: " to "Fecha de lanzamiento: ",
+        "Gêneros: " to "Géneros: ",
+        "Em destaque" to "Destacado",
+        "Prévia dos temas" to "Vista previa de temas",
+        "Abrir vídeo no site de origem" to "Abrir vídeo en su sitio de origen",
+        "Abrir trailer no navegador" to "Abrir tráiler en el navegador",
+        "Foto salva apenas neste dispositivo; o envio para a conta não está disponível." to "La foto se guarda solo en este dispositivo; la carga a la cuenta no está disponible.",
+        "Recebe eventos em tempo real enquanto o app está aberto; em segundo plano o Android pode adiar as consultas." to "Recibe eventos en tiempo real mientras la aplicación está abierta; Android puede retrasar las consultas en segundo plano.",
+        "Nenhuma descrição adicional foi publicada." to "No se ha publicado una descripción adicional.",
         "Artigo completo" to "Artículo completo",
         "Capturas de tela" to "Capturas de pantalla",
         "Imagens do artigo" to "Imágenes del artículo",
@@ -631,6 +669,24 @@ object AppI18n {
                 table.getValue("Data prevista: ") + value.removePrefix("Data prevista: ")
             value.startsWith("Plataformas: ") ->
                 table.getValue("Plataformas: ") + value.removePrefix("Plataformas: ")
+            value.startsWith("Classificação indicativa: ") ->
+                table.getValue("Classificação indicativa: ") + value.removePrefix("Classificação indicativa: ")
+            value.startsWith("Motor gráfico: ") ->
+                table.getValue("Motor gráfico: ") + value.removePrefix("Motor gráfico: ")
+            value.startsWith("Versão: ") ->
+                table.getValue("Versão: ") + value.removePrefix("Versão: ")
+            value.startsWith("Salvamento na nuvem: ") ->
+                table.getValue("Salvamento na nuvem: ") + value.removePrefix("Salvamento na nuvem: ")
+            value.startsWith("Idiomas suportados: ") ->
+                table.getValue("Idiomas suportados: ") + value.removePrefix("Idiomas suportados: ")
+            value.startsWith("Recursos: ") ->
+                table.getValue("Recursos: ") + value.removePrefix("Recursos: ")
+            value.startsWith("Modelo de salvamento: ") ->
+                table.getValue("Modelo de salvamento: ") + value.removePrefix("Modelo de salvamento: ")
+            value.startsWith("Data de lançamento: ") ->
+                table.getValue("Data de lançamento: ") + value.removePrefix("Data de lançamento: ")
+            value.startsWith("Gêneros: ") ->
+                table.getValue("Gêneros: ") + value.removePrefix("Gêneros: ")
             value.startsWith("Captura de tela de ") ->
                 table.getValue("Captura de tela de ") + value.removePrefix("Captura de tela de ")
             value.startsWith("Versão instalada: ") ->
