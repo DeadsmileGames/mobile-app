@@ -1142,6 +1142,10 @@ private fun NotificationPreference() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
     var enabled by remember { mutableStateOf(prefs.getBoolean("notifications_enabled", false)) }
+    var notifyGames by remember { mutableStateOf(prefs.getBoolean("notify_games", true)) }
+    var notifyNews by remember { mutableStateOf(prefs.getBoolean("notify_news", true)) }
+    var notifyVideos by remember { mutableStateOf(prefs.getBoolean("notify_videos", true)) }
+    var notifyPlatform by remember { mutableStateOf(prefs.getBoolean("notify_platform", true)) }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -1174,6 +1178,22 @@ private fun NotificationPreference() {
                 }
             }
         )
+        if (enabled) {
+            HorizontalDivider()
+            Text("Escolha os avisos que quer receber", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            PreferenceSwitch("Novos jogos", "Publicações e atualizações do catálogo.", notifyGames, {
+                notifyGames = it; prefs.edit().putBoolean("notify_games", it).apply()
+            })
+            PreferenceSwitch("Notícias", "Novas publicações e mudanças nas notícias.", notifyNews, {
+                notifyNews = it; prefs.edit().putBoolean("notify_news", it).apply()
+            })
+            PreferenceSwitch("Vídeos", "Vídeos adicionados ao feed.", notifyVideos, {
+                notifyVideos = it; prefs.edit().putBoolean("notify_videos", it).apply()
+            })
+            PreferenceSwitch("Eventos da conta", "Eventos da plataforma, como conquistas e lista de desejos.", notifyPlatform, {
+                notifyPlatform = it; prefs.edit().putBoolean("notify_platform", it).apply()
+            })
+        }
         permissionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
