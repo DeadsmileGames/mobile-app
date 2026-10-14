@@ -328,6 +328,59 @@ object AppI18n {
         "Seu catálogo" to "Your catalog",
         "Ver jogo" to "View game",
         "Nenhum jogo corresponde à busca." to "No games match your search.",
+        "Navegação" to "Navigation",
+        "Deadsmile Games" to "Deadsmile Games",
+        "Reproduzir vídeo" to "Play video",
+        "Explorar catálogo" to "Browse catalog",
+        "Atualização da conta" to "Account update",
+        "Classificação indicativa" to "Age rating",
+        "Atualização do catálogo de jogos" to "Game catalog update",
+        "Jogos, notícias e novidades da Deadsmile." to "Games, news and updates from Deadsmile.",
+        "Aqui ficam os vídeos publicados e seus links oficiais." to "Published videos and their official links appear here.",
+        "Aqui você encontra o resumo do Companion e o carrossel de jogos." to "Here you’ll find the Companion overview and game carousel.",
+        "Esta aba mostra as publicações e notícias carregadas da plataforma." to "This tab shows posts and news from the platform.",
+        "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos." to "Sign in, manage your profile, and access your wishlist here.",
+        "Buscar em todo o app" to "Search across the app",
+        "Buscar jogos, notícias e vídeos" to "Search games, news, and videos",
+        "Digite para pesquisar conteúdo" to "Type to search content",
+        "Resultados da busca" to "Search results",
+        "Nenhum resultado encontrado." to "No results found.",
+        "Pesquise pelo nome do jogo, notícia ou vídeo." to "Search by game, news article, or video title.",
+        "Jogo" to "Game",
+        "Notícia" to "News",
+        "Vídeo" to "Video",
+        "Remover da busca" to "Clear search",
+        "O idioma precisa ser escolhido para continuar." to "Choose a language to continue.",
+        "Classificação não informada" to "Rating not provided",
+        "Não foi possível carregar o conteúdo completo agora. Tente novamente." to "Could not load the full content right now. Please try again.",
+        "Enviamos um link de confirmação. Seu e-mail atual continua ativo até a confirmação." to "We sent a confirmation link. Your current email remains active until confirmation.",
+        "Preferências de privacidade salvas." to "Privacy preferences saved.",
+        "Não foi possível iniciar a verificação em duas etapas." to "Could not start two-step verification.",
+        "Verificação em duas etapas desativada." to "Two-step verification disabled.",
+        "Verificação em duas etapas ativada." to "Two-step verification enabled.",
+        "Não foi possível identificar este jogo para sua lista de desejos." to "Could not identify this game for your wishlist.",
+        "Jogo adicionado à lista de desejos." to "Game added to wishlist.",
+        "Digite o código de autenticação em duas etapas." to "Enter your two-step verification code.",
+        "Autenticação concluída." to "Authentication complete.",
+        "Conta criada. Confira seu e-mail para concluir a verificação." to "Account created. Check your email to complete verification.",
+        "Você saiu da conta." to "You have signed out.",
+        "Não foi possível conectar. Confira sua internet e tente novamente." to "Could not connect. Check your internet connection and try again.",
+        "E-mail ou senha não conferem." to "Email or password is incorrect.",
+        "Não foi possível autorizar esta ação. Confira sua conta e tente novamente." to "Could not authorize this action. Check your account and try again.",
+        "Este recurso não está disponível no momento." to "This feature is not available right now.",
+        "Esses dados já estão em uso. Confira as informações." to "These details are already in use. Check the information.",
+        "Algumas informações precisam ser corrigidas." to "Some information needs to be corrected.",
+        "Muitas tentativas em sequência. Aguarde um pouco e tente novamente." to "Too many attempts in a row. Please wait a moment and try again.",
+        "O serviço está indisponível agora. Tente novamente mais tarde." to "The service is unavailable right now. Please try again later.",
+        "Não foi possível concluir agora. Tente novamente." to "Could not complete this right now. Please try again.",
+        "English" to "English",
+        "Perfil atualizado." to "Profile updated.",
+        "Dispositivo desconectado." to "Device disconnected.",
+        "Agora adicione a chave ao seu aplicativo autenticador." to "Now add the key to your authenticator app.",
+        "Entre na conta para usar sua lista de desejos." to "Sign in to use your wishlist.",
+        "Jogo removido da lista de desejos." to "Game removed from wishlist.",
+        "Login realizado." to "Login successful.",
+        "Confira os dados informados e tente novamente." to "Check the information you entered and try again.",
     )
 
     private val spanish = mapOf(
@@ -650,16 +703,81 @@ object AppI18n {
         "Seu catálogo" to "Tu catálogo",
         "Ver jogo" to "Ver juego",
         "Nenhum jogo corresponde à busca." to "Ningún juego coincide con la búsqueda.",
+        "Español" to "Español",
+        "Navegação" to "Navegación",
+        "Deadsmile Games" to "Deadsmile Games",
+        "Reproduzir vídeo" to "Reproducir vídeo",
+        "Explorar catálogo" to "Explorar catálogo",
+        "Atualização da conta" to "Actualización de la cuenta",
+        "Classificação indicativa" to "Clasificación por edades",
+        "Atualização do catálogo de jogos" to "Actualización del catálogo de juegos",
+        "Jogos, notícias e novidades da Deadsmile." to "Juegos, noticias y novedades de Deadsmile.",
+        "Aqui ficam os vídeos publicados e seus links oficiais." to "Aquí encontrarás los vídeos publicados y sus enlaces oficiales.",
+        "Aqui você encontra o resumo do Companion e o carrossel de jogos." to "Aquí encontrarás el resumen de Companion y el carrusel de juegos.",
+        "Esta aba mostra as publicações e notícias carregadas da plataforma." to "Esta pestaña muestra las publicaciones y noticias de la plataforma.",
+        "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos." to "Desde aquí puedes iniciar sesión, gestionar tu perfil y acceder a tu lista de deseos.",
+        "Buscar em todo o app" to "Buscar en toda la aplicación",
+        "Buscar jogos, notícias e vídeos" to "Buscar juegos, noticias y vídeos",
+        "Digite para pesquisar conteúdo" to "Escribe para buscar contenido",
+        "Resultados da busca" to "Resultados de búsqueda",
+        "Nenhum resultado encontrado." to "No se encontraron resultados.",
+        "Pesquise pelo nome do jogo, notícia ou vídeo." to "Busca por el nombre del juego, noticia o vídeo.",
+        "Jogo" to "Juego",
+        "Notícia" to "Noticia",
+        "Vídeo" to "Vídeo",
+        "Remover da busca" to "Borrar búsqueda",
+        "O idioma precisa ser escolhido para continuar." to "Elige un idioma para continuar.",
+        "Classificação não informada" to "Clasificación no indicada",
+        "Não foi possível carregar o conteúdo completo agora. Tente novamente." to "No se pudo cargar el contenido completo ahora. Inténtalo de nuevo.",
+        "Enviamos um link de confirmação. Seu e-mail atual continua ativo até a confirmação." to "Enviamos un enlace de confirmación. Tu correo actual seguirá activo hasta que lo confirmes.",
+        "Preferências de privacidade salvas." to "Preferencias de privacidad guardadas.",
+        "Não foi possível iniciar a verificação em duas etapas." to "No se pudo iniciar la verificación en dos pasos.",
+        "Verificação em duas etapas desativada." to "Verificación en dos pasos desactivada.",
+        "Verificação em duas etapas ativada." to "Verificación en dos pasos activada.",
+        "Não foi possível identificar este jogo para sua lista de desejos." to "No se pudo identificar este juego para tu lista de deseos.",
+        "Jogo adicionado à lista de desejos." to "Juego añadido a la lista de deseos.",
+        "Digite o código de autenticação em duas etapas." to "Introduce el código de verificación en dos pasos.",
+        "Autenticação concluída." to "Autenticación completada.",
+        "Conta criada. Confira seu e-mail para concluir a verificação." to "Cuenta creada. Revisa tu correo para completar la verificación.",
+        "Você saiu da conta." to "Has cerrado sesión.",
+        "Não foi possível conectar. Confira sua internet e tente novamente." to "No se pudo conectar. Comprueba tu conexión a internet e inténtalo de nuevo.",
+        "E-mail ou senha não conferem." to "El correo o la contraseña no son correctos.",
+        "Não foi possível autorizar esta ação. Confira sua conta e tente novamente." to "No se pudo autorizar esta acción. Comprueba tu cuenta e inténtalo de nuevo.",
+        "Este recurso não está disponível no momento." to "Esta función no está disponible en este momento.",
+        "Esses dados já estão em uso. Confira as informações." to "Estos datos ya están en uso. Comprueba la información.",
+        "Algumas informações precisam ser corrigidas." to "Hay que corregir algunos datos.",
+        "Muitas tentativas em sequência. Aguarde um pouco e tente novamente." to "Demasiados intentos seguidos. Espera un momento e inténtalo de nuevo.",
+        "O serviço está indisponível agora. Tente novamente mais tarde." to "El servicio no está disponible ahora. Inténtalo de nuevo más tarde.",
+        "Não foi possível concluir agora. Tente novamente." to "No se pudo completar ahora. Inténtalo de nuevo.",
+        "Perfil atualizado." to "Perfil actualizado.",
+        "Dispositivo desconectado." to "Dispositivo desconectado.",
+        "Agora adicione a chave ao seu aplicativo autenticador." to "Ahora añade la clave a tu aplicación de autenticación.",
+        "Entre na conta para usar sua lista de desejos." to "Inicia sesión para usar tu lista de deseos.",
+        "Jogo removido da lista de desejos." to "Juego eliminado de la lista de deseos.",
+        "Login realizado." to "Inicio de sesión correcto.",
+        "Confira os dados informados e tente novamente." to "Revisa los datos que has introducido e inténtalo de nuevo.",
     )
 
     fun translate(context: Context, value: String): String {
         val saved = runCatching {
             context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE).getString("app_language", "").orEmpty()
         }.getOrDefault("")
-        val systemLanguage = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
-            ?: Locale.getDefault().language
-        val language = saved.ifBlank { systemLanguage }
+        // No language is persisted until the user selects one. Portuguese is used only to
+        // render the mandatory language chooser, never to silently configure the app.
+        val language = saved.ifBlank { "pt-BR" }
         return translate(language, value)
+    }
+
+    fun selectedLocale(context: Context): Locale {
+        val selected = runCatching {
+            context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE)
+                .getString("app_language", "").orEmpty()
+        }.getOrDefault("")
+        return when (selected.lowercase(Locale.ROOT)) {
+            "en" -> Locale.ENGLISH
+            "es" -> Locale("es")
+            else -> Locale("pt", "BR")
+        }
     }
 
     internal fun translate(language: String, value: String): String {

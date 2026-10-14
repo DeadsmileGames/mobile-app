@@ -253,7 +253,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         game
                     } else {
                         gate.withPermit {
-                            runCatching { api.get("/games/" + game.slug).detailItem(game) }.getOrDefault(game)
+                            runCatching { api.get("/games/" + game.slug).detailItem(game, preferGame = true) }.getOrDefault(game)
                         }
                     }
                 }
@@ -307,7 +307,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val loaded = withContext(Dispatchers.IO) {
             runCatching {
                 val route = if (isGame) "/games/" + slug else "/newswire/" + slug
-                api.get(route).detailItem(item)
+                api.get(route).detailItem(item, preferGame = isGame)
             }.getOrNull()
         }
         mutable.value = mutable.value.copy(

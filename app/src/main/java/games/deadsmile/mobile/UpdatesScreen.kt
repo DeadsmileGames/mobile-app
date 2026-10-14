@@ -61,7 +61,7 @@ fun UpdatesScreen(
     onOpenRelease: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val locale = runCatching { context.resources.configuration.locales[0] }.getOrNull() ?: Locale.getDefault()
+    val locale = AppI18n.selectedLocale(context)
     Column(
         Modifier.fillMaxSize().padding(pad).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
