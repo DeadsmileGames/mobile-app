@@ -92,6 +92,13 @@ private fun displayHtml(source: String): String {
         .replace(Regex("\\n{3,}"), "\n\n").trim()
 }
 
+private fun htmlImageUrls(source: String): List<String> {
+    val pattern = Regex("""<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
+    return pattern.findAll(source).mapNotNull { match ->
+        resolveAssetUrl(match.groupValues.getOrNull(1))
+    }.toList()
+}
+
 private fun JSONArray.strings(): List<String> = buildList {
     for (i in 0 until length()) {
         when (val entry = opt(i)) {
@@ -120,7 +127,7 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         .takeIf { it.startsWith("https://", ignoreCase = true) }
     val genres = (o.optJSONArray("genres") ?: o.optJSONArray("tags") ?: JSONArray()).strings()
     val screenArray = o.optJSONArray("screenshots") ?: o.optJSONArray("gallery") ?: JSONArray()
-    val screenshots = buildList {
+    val screenshots = (buildList {
         for (i in 0 until screenArray.length()) {
             val entry = screenArray.opt(i)
             val raw = when (entry) {
@@ -130,7 +137,7 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
             }
             resolveAssetUrl(raw)?.let(::add)
         }
-    }.distinct()
+    } + htmlImageUrls(rawBody)).distinct()
     val relatedArray = if (includeRelated) {
         o.optJSONArray("relatedGames") ?: o.optJSONArray("related_games") ?: o.optJSONArray("related") ?: o.optJSONArray("recommendations")
     } else null
