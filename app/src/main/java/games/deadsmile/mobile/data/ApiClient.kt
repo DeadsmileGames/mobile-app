@@ -100,8 +100,6 @@ class ApiClient(context: Context) {
             .getString("app_language", "").orEmpty()
         val builder = Request.Builder().url(BASE + path).header("Accept", "application/json")
             .header("User-Agent", "DeadsmileGamesCompanion/1.1.0")
-        // Never derive API content (notably age ratings) from the Android system locale.
-        // Until the user has chosen a language, omit Accept-Language instead of selecting one implicitly.
         when (selectedLanguage.lowercase(java.util.Locale.ROOT)) {
             "pt-br", "pt" -> builder.header("Accept-Language", "pt-BR")
             "en" -> builder.header("Accept-Language", "en")
