@@ -2061,6 +2061,96 @@ private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {
 }
 
 @Composable
+private fun GlobalSearchScreen(
+    state: UiState,
+    pad: PaddingValues,
+    onOpen: (FeedItem, Boolean) -> Unit
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val results = remember(state.games, state.news, state.videos, state.library, state.wishlist, query) {
+        val all = buildList {
+            state.games.forEach { add(it to "game") }
+            state.library.forEach { add(it to "game") }
+            state.wishlist.forEach { add(it to "game") }
+            state.news.forEach { add(it to "news") }
+            state.videos.forEach { add(it to "video") }
+        }.distinctBy { it.first.id.lowercase() }
+        val term = query.trim()
+        if (term.isBlank()) emptyList() else all.filter { (item, _) ->
+            item.title.contains(term, ignoreCase = true) ||
+                item.summary.contains(term, ignoreCase = true) ||
+                item.body.contains(term, ignoreCase = true) ||
+                item.developer.contains(term, ignoreCase = true) ||
+                item.publisher.contains(term, ignoreCase = true) ||
+                item.genres.any { it.contains(term, ignoreCase = true) }
+        }
+    }
+    Column(Modifier.fillMaxSize().padding(pad)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            placeholder = { Text("Buscar jogos, notícias e vídeos") },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = AppI18n.translate(LocalContext.current, "Buscar em todo o app")) },
+            trailingIcon = {
+                if (query.isNotBlank()) IconButton(onClick = { query = "" }) {
+                    Icon(Icons.Outlined.Close, contentDescription = AppI18n.translate(LocalContext.current, "Remover da busca"))
+                }
+            }
+        )
+        when {
+            query.isBlank() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Empty("Pesquise pelo nome do jogo, notícia ou vídeo.")
+            }
+            results.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Empty("Nenhum resultado encontrado.")
+            }
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item { Text("Resultados da busca", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                items(results, key = { it.second + ":" + it.first.id }) { (item, kind) ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { onOpen(item, kind == "game") },
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier.size(width = 72.dp, height = 96.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            ) {
+                                val artwork = if (kind == "game" && !item.posterImage.isNullOrBlank()) item.copy(image = item.posterImage) else item
+                                GameArtwork(artwork, Modifier.fillMaxSize())
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    when (kind) { "game" -> "Jogo"; "news" -> "Notícia"; else -> "Vídeo" },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                val summary = item.summary.ifBlank { item.developer.ifBlank { item.publisher } }
+                                if (summary.isNotBlank()) Text(summary, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
     if (loading && content.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
