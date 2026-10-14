@@ -19,6 +19,7 @@ import games.deadsmile.mobile.MainActivity
 import games.deadsmile.mobile.AppI18n
 import games.deadsmile.mobile.R
 import org.json.JSONObject
+import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -55,16 +56,26 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                 .onFailure { failures++ }.getOrNull().orEmpty()
             if (items.isEmpty()) continue
             succeeded++
-            val key = "notification_last_" + stream.key
-            val latestId = items.first().id
+            val key = "notification_seen_ids_" + stream.key
             val previous = preferences.getString(key, null)
-            // Save a baseline the first time, instead of notifying about old content.
-            preferences.edit().putString(key, latestId).apply()
-            if (previous == null || previous == latestId) continue
+            val seenIds = previous?.let { raw ->
+                runCatching {
+                    val saved = JSONArray(raw)
+                    buildSet {
+                        for (index in 0 until saved.length()) saved.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                    }
+                }.getOrDefault(emptySet())
+            }
+            if (seenIds == null) {
+                // The first successful poll establishes a baseline and never emits historical alerts.
+                preferences.edit().putString(key, JSONArray(items.map { it.id }).toString()).apply()
+                continue
+            }
 
-            // Notify about several new entries when the app has been asleep for a while.
-            val newer = items.takeWhile { it.id != previous }.take(3)
-                .ifEmpty { listOf(items.first()) }
+            // Compare every identifier in the current page, not only its first row.
+            val newer = items.filterNot { it.id in seenIds }.take(3)
+            val refreshedIds = (items.map { it.id } + seenIds).distinct().take(144)
+            preferences.edit().putString(key, JSONArray(refreshedIds).toString()).apply()
             newer.forEach { entry ->
                 val summary = entry.summary.takeIf { it.isNotBlank() } ?: entry.title
                 sendNotification(context, (stream.key + entry.id).hashCode(), stream.title, summary)
