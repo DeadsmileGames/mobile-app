@@ -23,7 +23,7 @@ class ApiClient(context: Context) {
         private const val HOST = "api-ust8.onrender.com"
         private val JSON = "application/json; charset=utf-8".toMediaType()
     }
-    private val languageTag = context.resources.configuration.locales.get(0)?.toLanguageTag()?.take(35)?.ifBlank { "pt-BR" } ?: "pt-BR"
+    private val appContext = context.applicationContext
     private val prefs = EncryptedSharedPreferences.create(
         context, "deadsmile-session",
         MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
@@ -96,8 +96,17 @@ class ApiClient(context: Context) {
         }
     }
     private fun execute(method: String, path: String, body: JSONObject?, token: String?): JSONObject {
+        val selectedLanguage = appContext.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE)
+            .getString("app_language", "").orEmpty()
         val builder = Request.Builder().url(BASE + path).header("Accept", "application/json")
-            .header("Accept-Language", languageTag).header("User-Agent", "DeadsmileGamesCompanion/1.1.0")
+            .header("User-Agent", "DeadsmileGamesCompanion/1.1.0")
+        // Never derive API content (notably age ratings) from the Android system locale.
+        // Until the user has chosen a language, omit Accept-Language instead of selecting one implicitly.
+        when (selectedLanguage.lowercase(java.util.Locale.ROOT)) {
+            "pt-br", "pt" -> builder.header("Accept-Language", "pt-BR")
+            "en" -> builder.header("Accept-Language", "en")
+            "es" -> builder.header("Accept-Language", "es")
+        }
         if (token != null) builder.header("X-CSRF-Token", token)
         builder.method(method, if (body != null) body.toString().toRequestBody(JSON) else null)
         client.newCall(builder.build()).execute().use { response ->
