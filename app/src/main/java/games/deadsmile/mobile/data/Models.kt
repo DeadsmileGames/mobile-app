@@ -111,7 +111,7 @@ private fun JSONArray.strings(): List<String> = buildList {
 private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Boolean): FeedItem {
     val title = o.firstText("title", "name", "gameTitle", "game_title").ifBlank { "Sem título" }
     val slug = o.firstText("slug", "newsSlug", "gameSlug")
-    val id = o.firstText("id", "uuid").ifBlank { slug.ifBlank { fallbackId } }
+    val id = o.firstText("id", "uuid", "gameId", "game_id").ifBlank { slug.ifBlank { fallbackId } }
     val image = resolveAssetUrl(o.firstText(
         "coverImage", "cover_image", "image", "thumbnail", "thumbnail_url", "thumbnailUrl",
         "heroImage", "hero_image", "bannerImage", "banner_image", "poster", "cover", "icon"
