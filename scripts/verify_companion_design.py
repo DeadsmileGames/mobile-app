@@ -10,6 +10,8 @@ DIRECT_MANIFEST_PATH = ROOT / "app/src/direct/AndroidManifest.xml"
 RELEASE_WORKFLOW_PATH = ROOT / ".github/workflows/release-android.yml"
 UPDATES_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/UpdatesScreen.kt"
 STRINGS_PATH = ROOT / "app/src/main/res/values/strings.xml"
+STRINGS_EN_PATH = ROOT / "app/src/main/res/values-en/strings.xml"
+ANDROID_WORKFLOW_PATH = ROOT / ".github/workflows/android-apk.yml"
 MAIN_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/MainActivity.kt"
 I18N_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/AppI18n.kt"
 API_PATH = ROOT / "app/src/main/java/games/deadsmile/mobile/data/ApiClient.kt"
@@ -37,6 +39,8 @@ DIRECT_MANIFEST = read(DIRECT_MANIFEST_PATH)
 RELEASE_WORKFLOW = read(RELEASE_WORKFLOW_PATH)
 UPDATES = read(UPDATES_PATH)
 STRINGS = read(STRINGS_PATH)
+STRINGS_EN = read(STRINGS_EN_PATH)
+ANDROID_WORKFLOW = read(ANDROID_WORKFLOW_PATH)
 
 def function_block(source: str, name: str) -> str:
     pattern = re.compile(r"@Composable\s+(?:private\s+)?fun\s+" + re.escape(name) + r"\s*\(")
@@ -128,6 +132,9 @@ RELEASE_CHECKS = [
     ("direct manifest retains update permission", "REQUEST_INSTALL_PACKAGES" in DIRECT_MANIFEST),
     ("Play update UI defers updates to Google Play", 'isPlayDistribution -> "As atualizações desta versão são gerenciadas pela Google Play."' in UPDATES),
     ("launcher label is the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS),
+    ("English launcher label matches the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS_EN),
+    ("CI smoke-builds release APK and Play AAB variants", "assembleDirectRelease assemblePlayRelease bundlePlayRelease" in ANDROID_WORKFLOW),
+    ("CI verifies Play APK omits package installation permission", "PLAY_PERMS" in ANDROID_WORKFLOW and "REQUEST_INSTALL_PACKAGES" in ANDROID_WORKFLOW),
     ("release workflow builds direct APK", "assembleDirectRelease" in RELEASE_WORKFLOW),
     ("release workflow builds Play App Bundle", "bundlePlayRelease" in RELEASE_WORKFLOW),
     ("release workflow validates package and target API", "com.deadsmilegames.companion" in RELEASE_WORKFLOW and "targetSdkVersion:'36'" in RELEASE_WORKFLOW),
