@@ -847,14 +847,14 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+            Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 136.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 GameArtwork(item, Modifier.fillMaxSize())
             }
             Column(Modifier.fillMaxWidth().weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3, overflow = TextOverflow.Ellipsis)
+                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (!compact && item.status.isNotBlank()) 1 else 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.weight(1f))
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
