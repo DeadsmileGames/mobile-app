@@ -66,7 +66,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     api.get("/videos?limit=24&offset=" + offset).feed("items", "videos")
                 } }
                 val totalPages = initial.third?.optJSONObject("pagination")
-                    ?.optInt("totalPages", 1)?.coerceIn(1, 999) ?: 1
+                    ?.optInt("totalPages", 1)?.coerceIn(1, 209) ?: 1
                 val games = async { completePagedGames(initialGames, totalPages) { page ->
                     api.get("/games?page=" + page + "&limit=48").feed("items", "games")
                 } }
@@ -110,7 +110,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }.awaitAll()
         }
-        return (first + remaining.flatten()).distinctBy { it.id }
+        return (first + remaining.flatten()).distinctBy { it.id }.take(10_000)
     }
     fun loadDetails(item: FeedItem, isGame: Boolean) = viewModelScope.launch {
         mutable.value = mutable.value.copy(detail = item, detailLoading = true)
