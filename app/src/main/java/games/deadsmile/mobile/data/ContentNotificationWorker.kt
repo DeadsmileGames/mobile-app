@@ -8,7 +8,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -169,8 +168,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, AppI18n.translate(context, "Novidades do catálogo"), NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = AppI18n.translate(context, "Novos jogos, notícias e vídeos.")
-                enableLights(true)
-                lightColor = Color.rgb(129, 115, 255)
             }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
@@ -192,7 +189,6 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
             .setStyle(NotificationCompat.BigTextStyle().bigText(localizedMessage))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setColor(Color.rgb(129, 115, 255))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
