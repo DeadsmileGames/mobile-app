@@ -145,6 +145,9 @@ private fun DeadsmileRoot(
             vm.dismiss()
         }
     }
+    LaunchedEffect(page, detailItem?.id, detailItem?.slug, detailIsGame) {
+        if (page == Page.DETAILS) detailItem?.let { vm.loadDetails(it, detailIsGame) }
+    }
 
     Scaffold(
         topBar = {
@@ -223,10 +226,15 @@ private fun DeadsmileRoot(
                     reduceMotion = reduceMotion, onReduceMotion = onReduceMotion
                 )
                 Page.DETAILS -> detailItem?.let { item ->
+                    val displayItem = state.detail?.takeIf {
+                        it.id == item.id || (item.slug.isNotBlank() && it.slug == item.slug)
+                    } ?: item
                     GameDetailsScreen(
-                        item = item, isGame = detailIsGame, pad = pad,
+                        item = displayItem, isGame = detailIsGame, pad = pad,
+                        loading = state.detailLoading,
+                        onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
-                        onOpenVideo = { item.url?.let { url -> openExternal(context, url) } }
+                        onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {})
             }
@@ -409,19 +417,25 @@ private fun GameDetailsScreen(
     item: FeedItem,
     isGame: Boolean,
     pad: PaddingValues,
+    loading: Boolean,
+    onRelated: (FeedItem) -> Unit,
     onOpenSite: () -> Unit,
     onOpenVideo: () -> Unit
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
-        contentPadding = PaddingValues(bottom = 30.dp),
+        contentPadding = PaddingValues(bottom = 34.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item {
-            Box(Modifier.fillMaxWidth().height(275.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                if (item.image != null) {
-                    AsyncImage(item.image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    Box(Modifier.fillMaxSize().background(BrandInk.copy(alpha = 0.42f)))
+            Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                item.image?.let { image ->
+                    AsyncImage(image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    Box(Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
+                        )
+                    ))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
@@ -438,28 +452,65 @@ private fun GameDetailsScreen(
             }
         }
         item {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    if (isGame) "Detalhes do jogo" else "Sobre este conteúdo",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                if (loading) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Carregando informações…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 if (item.summary.isNotBlank()) Text(item.summary, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(item.body.ifBlank { item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." } }, style = MaterialTheme.typography.bodyLarge)
                 if (isGame) {
+                    val meta = listOfNotNull(
+                        item.developer.takeIf { it.isNotBlank() }?.let { "Desenvolvido por $it" },
+                        item.publisher.takeIf { it.isNotBlank() }?.let { "Publicado por $it" },
+                        item.genres.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+                    )
+                    if (meta.isNotEmpty()) {
+                        Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                            Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                meta.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            }
+                        }
+                    }
                     Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary)
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Experiência para PC", fontWeight = FontWeight.SemiBold)
-                                Text("A instalação pelo celular ainda não está disponível. Consulte o site ou use o launcher para Windows.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Disponível para PC", fontWeight = FontWeight.SemiBold)
+                                Text("A instalação pelo celular ainda não está disponível. Você pode consultar os detalhes no site ou usar o launcher para Windows.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
-                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                        Text("Ver no site Deadsmile")
-                    }
+                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver no site Deadsmile") }
                 } else {
+                    val byline = listOf(item.author, item.publishedAt).filter { it.isNotBlank() }.joinToString(" · ")
+                    if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(if (isGame) "Sobre o jogo" else "Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                val completeBody = item.body.ifBlank { item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." } }
+                Text(completeBody, style = MaterialTheme.typography.bodyLarge, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.14f)
+                if (item.screenshots.isNotEmpty()) {
+                    Text("Capturas de tela", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(item.screenshots, key = { it }) { screenshot ->
+                            AsyncImage(
+                                screenshot, "Captura de tela de ${item.title}",
+                                Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+                if (item.relatedGames.isNotEmpty()) {
+                    Text("Jogos relacionados", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(item.relatedGames, key = { it.id }) { related ->
+                            FeedCard(related, Modifier.width(205.dp), "Ver detalhes") { onRelated(related) }
+                        }
+                    }
+                }
+                if (!isGame) {
                     if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Abrir conteúdo") }
                     OutlinedButton(onClick = onOpenSite, modifier = Modifier.fillMaxWidth()) { Text("Visitar Deadsmile Games") }
                 }
@@ -575,7 +626,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) 
 
     val images = remember(state.games, state.news, state.videos) {
         (state.games + state.news + state.videos).mapNotNull { it.image }.distinct().take(12)
-            .ifEmpty { listOf("https://raw.githubusercontent.com/deadsmilegames/launcher/main/public/readme.png") }
+            .ifEmpty { listOf("https://raw.githubusercontent.com/deadsmilegames/launcher/main/winui/src/Deadsmile.Launcher/Assets/LargeTile.png") }
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
