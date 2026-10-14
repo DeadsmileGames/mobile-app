@@ -660,8 +660,6 @@ private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit
 }
 
 @Composable
-
-@Composable
 private fun Home(
     state: UiState,
     pad: PaddingValues,
@@ -920,6 +918,7 @@ private fun GameDetailsScreen(
 
 @Composable
 private fun GameAvailabilityCard(item: FeedItem) {
+    val context = LocalContext.current
     var now by remember(item.releaseDate, item.status) { mutableLongStateOf(System.currentTimeMillis()) }
     val target = remember(item.releaseDate) { releaseTargetMillis(item.releaseDate) }
     LaunchedEffect(target, item.status) {
