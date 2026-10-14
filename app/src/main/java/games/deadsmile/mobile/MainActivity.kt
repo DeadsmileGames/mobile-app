@@ -801,7 +801,7 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
         if (filtered.isEmpty()) {
             item { Empty("Nenhum resultado para essa busca. Tente outro termo.") }
         } else {
-            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth()) { open(item) } }
+            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth().height(292.dp)) { open(item) } }
         }
     }
 }
@@ -841,7 +841,8 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3, overflow = TextOverflow.Ellipsis)
-                if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -1847,7 +1848,6 @@ private fun youtubeVideoId(url: String): String? {
 
 @Composable
 private fun VideoPlayerScreen(item: FeedItem, pad: PaddingValues) {
-    val context = LocalContext.current
     val videoId = remember(item.url) { item.url?.let(::youtubeVideoId) }
     Column(
         Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
