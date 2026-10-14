@@ -137,7 +137,7 @@ object GitHubReleaseRepository {
     internal fun normalizeVersion(value: String): String? {
         val normalized = value.trim().removePrefix("v").removePrefix("V").substringBefore('+')
         val core = normalized.substringBefore('-')
-        if (!core.matches(Regex("""\d+(?:\.\d+){1,3}"""))) return null
+        if (!core.matches(Regex("""\d+\.\d+\.\d+"""))) return null
         return core.split('.').mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }?.joinToString(".")
     }
 
