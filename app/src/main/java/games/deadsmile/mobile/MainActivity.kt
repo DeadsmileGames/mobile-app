@@ -1789,3 +1789,161 @@ private fun openExternal(context: Context, value: String) {
         context.startActivity(intent)
     }
 }
+
+
+private fun youtubeVideoId(url: String): String? {
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+    val host = uri.host?.lowercase().orEmpty()
+    val candidate = when {
+        host == "youtu.be" -> uri.lastPathSegment
+        host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com") ->
+            if (uri.path == "/watch") uri.getQueryParameter("v") else {
+                val segments = uri.pathSegments
+                when (segments.firstOrNull()) { "embed", "shorts", "live" -> segments.getOrNull(1); else -> null }
+            }
+        else -> null
+    }?.trim()
+    return candidate?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{6,20}")) }
+}
+
+@Composable
+private fun VideoPlayerScreen(item: FeedItem, pad: PaddingValues) {
+    val context = LocalContext.current
+    val videoId = remember(item.url) { item.url?.let(::youtubeVideoId) }
+    Column(
+        Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(item.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (videoId == null) {
+            Empty("Este conteúdo não oferece um player do YouTube compatível.")
+        } else {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp)),
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = true
+                        settings.javaScriptCanOpenWindowsAutomatically = false
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl("https://www.youtube-nocookie.com/embed/" + videoId + "?playsinline=1&rel=0")
+                    }
+                },
+                update = { view ->
+                    val expected = "https://www.youtube-nocookie.com/embed/" + videoId + "?playsinline=1&rel=0"
+                    if (view.url != expected) view.loadUrl(expected)
+                }
+            )
+            Text("Reprodução integrada ao Companion", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            if (item.summary.isNotBlank()) Text(item.summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.76f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 420.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Escolha seu idioma", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Você pode mudar isso depois nas configurações.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = { onSelect("pt-BR") }, modifier = Modifier.fillMaxWidth()) { Text("Português (Brasil)") }
+                OutlinedButton(onClick = { onSelect("en") }, modifier = Modifier.fillMaxWidth()) { Text("English") }
+                OutlinedButton(onClick = { onSelect("es") }, modifier = Modifier.fillMaxWidth()) { Text("Español") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(content, query) {
+        val q = query.trim()
+        if (q.isBlank()) content else content.filter {
+            it.title.contains(q, true) || it.summary.contains(q, true) || it.genres.any { g -> g.contains(q, true) }
+        }
+    }
+    if (loading && content.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    Column(Modifier.fillMaxSize().padding(pad)) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            placeholder = { Text("Buscar jogos") }, singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = { if (query.isNotBlank()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "Limpar busca") } }
+        )
+        if (filtered.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) { Empty(if (content.isEmpty()) "O catálogo não está disponível agora. Tente atualizar em alguns instantes." else "Nenhum jogo corresponde à busca.") }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 156.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                gridItems(filtered, key = { it.id }) { game ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().height(276.dp).clickable { open(game) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        Column(Modifier.fillMaxSize()) {
+                            Box(Modifier.fillMaxWidth().height(156.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                                if (game.image != null) SubcomposeAsyncImage(
+                                    model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                                ) {
+                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                    else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(game.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(game.summary.ifBlank { game.genres.take(2).joinToString(" · ") }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.weight(1f))
+                                Text("Ver detalhes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsScreen() {
+    val context = LocalContext.current
+    var notifications by remember { mutableStateOf(games.deadsmile.mobile.data.LocalNotificationStore.load(context)) }
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Notificações", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Salvas neste dispositivo", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = { games.deadsmile.mobile.data.LocalNotificationStore.clear(context); notifications = emptyList() }, enabled = notifications.isNotEmpty()) { Text("Limpar") }
+        }
+        if (notifications.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Empty("Você ainda não tem notificações. As novidades aparecerão aqui.") }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                items(notifications, key = { it.id }) { notice ->
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                            Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(notice.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(notice.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                                Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(notice.timestamp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
