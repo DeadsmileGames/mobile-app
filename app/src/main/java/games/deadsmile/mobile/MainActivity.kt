@@ -58,7 +58,6 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material3.*
 import androidx.compose.material3.Text as MaterialText
-import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -125,7 +124,6 @@ private fun Text(
     softWrap: Boolean = true,
     maxLines: Int = Int.MAX_VALUE,
     minLines: Int = 1,
-    inlineContent: Map<String, InlineTextContent> = mapOf(),
     onTextLayout: (TextLayoutResult) -> Unit = {},
     style: TextStyle = LocalTextStyle.current
 ) {
@@ -145,7 +143,6 @@ private fun Text(
         softWrap = softWrap,
         maxLines = maxLines,
         minLines = minLines,
-        inlineContent = inlineContent,
         onTextLayout = onTextLayout,
         style = style
     )
