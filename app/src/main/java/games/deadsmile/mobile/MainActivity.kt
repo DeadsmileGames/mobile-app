@@ -70,6 +70,7 @@ import coil.compose.AsyncImage
 import games.deadsmile.mobile.data.AppViewModel
 import games.deadsmile.mobile.data.FeedItem
 import games.deadsmile.mobile.data.UiState
+import games.deadsmile.mobile.data.PrivacyOptions
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
