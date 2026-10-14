@@ -19,7 +19,7 @@ import games.deadsmile.mobile.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Periodically checks the same public feeds rendered by the app. */
+/** Checks the app's public feeds periodically; Android controls exact run timing to preserve battery. */
 class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
 
@@ -34,26 +34,36 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         createChannel(context)
         val api = ApiClient(context)
         val streams = listOf(
-            Stream("news", "Notícias novas") { api.get("/newswire?limit=1&offset=0").feed("items", "news").firstOrNull() },
-            Stream("videos", "Novo vídeo") { api.get("/videos?limit=1&offset=0").feed("items", "videos").firstOrNull() },
-            Stream("games", "Jogo no catálogo") { api.get("/games?page=1&limit=1").feed("items", "games").firstOrNull() }
+            Stream("news", "Novidade na Deadsmile") { api.get("/newswire?limit=24&offset=0").feed("items", "news") },
+            Stream("videos", "Novo vídeo") { api.get("/videos?limit=24&offset=0").feed("items", "videos") },
+            Stream("games", "Novo jogo no catálogo") { api.get("/games?page=1&limit=48").feed("items", "games") }
         )
         var succeeded = 0
         var failures = 0
         for (stream in streams) {
-            val item = runCatching { stream.load() }.onFailure { failures++ }.getOrNull() ?: continue
+            val items = runCatching { stream.load().distinctBy { it.id } }
+                .onFailure { failures++ }.getOrNull().orEmpty()
+            if (items.isEmpty()) continue
             succeeded++
             val key = "notification_last_" + stream.key
+            val latestId = items.first().id
             val previous = preferences.getString(key, null)
-            preferences.edit().putString(key, item.id).apply()
-            if (previous != null && previous != item.id) {
-                sendNotification(context, stream.key.hashCode(), stream.title, item.title)
+            // Save a baseline the first time, instead of notifying about old content.
+            preferences.edit().putString(key, latestId).apply()
+            if (previous == null || previous == latestId) continue
+
+            // Notify about several new entries when the app has been asleep for a while.
+            val newer = items.takeWhile { it.id != previous }.take(3)
+                .ifEmpty { listOf(items.first()) }
+            newer.forEach { entry ->
+                val summary = entry.summary.takeIf { it.isNotBlank() } ?: entry.title
+                sendNotification(context, (stream.key + entry.id).hashCode(), stream.title, summary)
             }
         }
         if (succeeded == 0 && failures > 0) Result.retry() else Result.success()
     }
 
-    private data class Stream(val key: String, val title: String, val load: () -> FeedItem?)
+    private data class Stream(val key: String, val title: String, val load: () -> List<FeedItem>)
 
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
