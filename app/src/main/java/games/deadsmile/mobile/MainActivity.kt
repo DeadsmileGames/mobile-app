@@ -410,12 +410,12 @@ private fun DeadsmileRoot(
                             Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
-                    if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
                         IconButton(onClick = { returnPage = page; page = Page.NOTIFICATIONS }) {
                             Icon(Icons.Default.Notifications, contentDescription = AppI18n.translate(LocalContext.current, "Notificações"))
                         }
                     }
-                    if (tourStage < 0) {
+                    if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
                         IconButton(onClick = {
                             when (page) {
                                 Page.ACCOUNT -> vm.account()
@@ -807,6 +807,38 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
 }
 
 @Composable
+private const val ABBY_OFFICIAL_ARTWORK = "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
+
+@Composable
+private fun GameArtwork(item: FeedItem, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
+    val isAbby = item.title.contains("abby", true) && item.title.contains("restless", true)
+    var useOfficialFallback by remember(item.id, item.image) { mutableStateOf(item.image.isNullOrBlank() && isAbby) }
+    val model = if (useOfficialFallback) ABBY_OFFICIAL_ARTWORK else item.image
+    if (model == null) {
+        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    SubcomposeAsyncImage(model = model, contentDescription = item.title, modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentScale = contentScale) {
+        when {
+            painter.state is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+            painter.state is AsyncImagePainter.State.Error && isAbby && !useOfficialFallback -> {
+                LaunchedEffect(item.id, item.image) { useOfficialFallback = true }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
+            painter.state is AsyncImagePainter.State.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+        }
+    }
+}
+
 private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -1430,7 +1462,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 
     val images = remember(state.games) {
         val abby = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) }
-        (abby?.screenshots.orEmpty().ifEmpty { listOfNotNull(abby?.image) }).distinct().take(12)
+        (abby?.screenshots.orEmpty() + listOfNotNull(abby?.image) + ABBY_OFFICIAL_ARTWORK).distinct().take(13)
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
