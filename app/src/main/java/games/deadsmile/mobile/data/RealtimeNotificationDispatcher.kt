@@ -17,7 +17,6 @@ import games.deadsmile.mobile.R
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Sends live API events to Android's notification tray while the foreground socket is connected. */
 object RealtimeNotificationDispatcher {
     private const val CHANNEL_ID = "deadsmile_content_updates"
     private const val PREFS = "deadsmile-ui"
