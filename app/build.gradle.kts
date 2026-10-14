@@ -51,7 +51,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (releaseSigningConfigured) signingConfig = signingConfigs.getByName("githubRelease")
+            signingConfig = if (releaseSigningConfigured) {
+                signingConfigs.getByName("githubRelease")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
