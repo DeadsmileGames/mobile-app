@@ -75,7 +75,7 @@ import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
     HOME("Início"), GAMES("Jogos"), NEWS("Notícias"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
-    ACCOUNT("Conta"), SETTINGS("Configurações"), DETAILS("Detalhes")
+    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes")
 }
 
 private val BrandInk = Color(0xFF111019)
@@ -168,14 +168,14 @@ private fun DeadsmileRoot(
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST) {
                         IconButton(onClick = { page = if (page == Page.DETAILS) returnPage else returnPage }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                         }
                     }
                 },
                 actions = {
-                    if (page != Page.SETTINGS && page != Page.DETAILS) {
+                    if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Default.Settings, contentDescription = "Configurações")
                         }
@@ -224,7 +224,14 @@ private fun DeadsmileRoot(
                     }
                 }
                 Page.LIBRARY -> LibraryScreen(state, pad) { page = Page.ACCOUNT }
-                Page.ACCOUNT -> AccountScreen(state, pad, vm)
+                Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.WISHLIST; page = Page.WISHLIST }
+                Page.WISHLIST -> WishlistScreen(
+                    state = state,
+                    pad = pad,
+                    openGame = { item -> detailItem = item; detailIsGame = true; returnPage = Page.WISHLIST; page = Page.DETAILS },
+                    signIn = { returnPage = Page.WISHLIST; page = Page.ACCOUNT },
+                    remove = vm::removeWishlist
+                )
                 Page.SETTINGS -> SettingsScreen(
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
@@ -237,6 +244,11 @@ private fun DeadsmileRoot(
                     GameDetailsScreen(
                         item = displayItem, isGame = detailIsGame, pad = pad,
                         loading = state.detailLoading,
+                        isWishlisted = state.wishlist.any { it.id.equals(displayItem.id, ignoreCase = true) },
+                        onToggleWishlist = {
+                            if (state.user == null) { returnPage = Page.DETAILS; page = Page.ACCOUNT }
+                            else vm.toggleWishlist(displayItem)
+                        },
                         onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
                         onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
@@ -424,6 +436,8 @@ private fun GameDetailsScreen(
     isGame: Boolean,
     pad: PaddingValues,
     loading: Boolean,
+    isWishlisted: Boolean,
+    onToggleWishlist: () -> Unit,
     onRelated: (FeedItem) -> Unit,
     onOpenSite: () -> Unit,
     onOpenVideo: () -> Unit
@@ -489,6 +503,11 @@ private fun GameDetailsScreen(
                         }
                     }
                     Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver no site Deadsmile") }
+                    OutlinedButton(onClick = onToggleWishlist, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                        Icon(if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isWishlisted) "Remover da lista de desejos" else "Adicionar à lista de desejos")
+                    }
                 } else {
                     val byline = listOf(item.author, item.publishedAt).filter { it.isNotBlank() }.joinToString(" · ")
                     if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -519,6 +538,63 @@ private fun GameDetailsScreen(
                 if (!isGame) {
                     if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Abrir conteúdo") }
                     OutlinedButton(onClick = onOpenSite, modifier = Modifier.fillMaxWidth()) { Text("Visitar Deadsmile Games") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WishlistScreen(
+    state: UiState,
+    pad: PaddingValues,
+    openGame: (FeedItem) -> Unit,
+    signIn: () -> Unit,
+    remove: (String) -> Unit
+) {
+    if (state.user == null) {
+        Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) {
+            Card(shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.FavoriteBorder, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text("Sua lista de desejos", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Entre na sua conta para guardar jogos e sincronizar sua lista com o launcher.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = signIn) { Text("Entrar na conta") }
+                }
+            }
+        }
+    } else if (state.wishlist.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Default.FavoriteBorder, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Sua lista está vazia", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Adicione jogos aos favoritos pela tela de detalhes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    } else {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(pad),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Text("Lista de desejos", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Sincronizada com sua conta Deadsmile", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(state.wishlist, key = { it.id }) { game ->
+                Card(shape = RoundedCornerShape(20.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (game.image != null) AsyncImage(game.image, game.title, Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
+                        else Box(Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp))
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(game.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                            if (game.summary.isNotBlank()) Text(game.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                            TextButton(onClick = { openGame(game) }, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Ver detalhes") }
+                            TextButton(onClick = { remove(game.id) }, enabled = !state.busy, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Remover da lista") }
+                        }
+                    }
                 }
             }
         }
@@ -579,7 +655,7 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
 }
 
 @Composable
-private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) {
+private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, goWishlist: () -> Unit) {
     val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
