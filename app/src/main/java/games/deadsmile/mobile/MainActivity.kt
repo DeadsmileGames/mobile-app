@@ -891,7 +891,12 @@ private fun GameDetailsScreen(
                     ))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) Color.White else MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
