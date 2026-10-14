@@ -279,6 +279,30 @@ object AppI18n {
         "Deadsmile Games Companion for Android" to "Deadsmile Games Companion for Android",
         "Consulte o histórico de versões e os APKs publicados no GitHub." to "View version history and APKs published on GitHub.",
         "Ver histórico de atualizações" to "View update history",
+        "Idioma" to "Language",
+        "O idioma é aplicado em todo o app." to "The selected language is applied throughout the app.",
+        "Escolha seu idioma" to "Choose your language",
+        "Você pode mudar isso depois nas configurações." to "You can change this later in Settings.",
+        "Português (Brasil)" to "Português (Brazil)",
+        "Español" to "Spanish",
+        "Notificações" to "Notifications",
+        "Reproduzindo" to "Now playing",
+        "Salvas neste dispositivo" to "Saved on this device",
+        "Você ainda não tem notificações. As novidades aparecerão aqui." to "You do not have any notifications yet. Updates will appear here.",
+        "Limpar" to "Clear",
+        "Este conteúdo não oferece um player do YouTube compatível." to "This content does not provide a compatible YouTube player.",
+        "Reprodução integrada ao Companion" to "Playing inside Companion",
+        "Assistir no app" to "Watch in app",
+        "Foto aplicada neste dispositivo. Não precisa salvar o perfil." to "Photo saved on this device. You do not need to save the profile.",
+        "Foto aplicada neste dispositivo. Salve o perfil para sincronizar a imagem da conta." to "Photo applied on this device. Save your profile to sync it with your account.",
+        "Foto aplicada neste dispositivo. A imagem ficará salva localmente." to "Photo applied on this device. The image will be saved locally.",
+        "Foto removida." to "Photo removed.",
+        "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP." to "Could not read that photo. Try a JPG, PNG, or WebP image.",
+        "Foto salva neste dispositivo" to "Photo saved on this device",
+        "Foto local removida." to "Local photo removed.",
+        "Seu catálogo" to "Your catalog",
+        "Ver jogo" to "View game",
+        "Nenhum jogo corresponde à busca." to "No games match your search.",
     )
 
     private val spanish = mapOf(
@@ -552,11 +576,39 @@ object AppI18n {
         "Deadsmile Games Companion for Android" to "Deadsmile Games Companion para Android",
         "Consulte o histórico de versões e os APKs publicados no GitHub." to "Consulta el historial de versiones y los APK publicados en GitHub.",
         "Ver histórico de atualizações" to "Ver historial de actualizaciones",
+        "Idioma" to "Idioma",
+        "O idioma é aplicado em todo o app." to "El idioma seleccionado se aplica a toda la aplicación.",
+        "Escolha seu idioma" to "Elige tu idioma",
+        "Você pode mudar isso depois nas configurações." to "Puedes cambiarlo más adelante en los ajustes.",
+        "Português (Brasil)" to "Portugués (Brasil)",
+        "English" to "Inglés",
+        "Notificações" to "Notificaciones",
+        "Reproduzindo" to "Reproduciendo",
+        "Salvas neste dispositivo" to "Guardadas en este dispositivo",
+        "Você ainda não tem notificações. As novidades aparecerão aqui." to "Todavía no tienes notificaciones. Las novedades aparecerán aquí.",
+        "Limpar" to "Limpiar",
+        "Este conteúdo não oferece um player do YouTube compatível." to "Este contenido no ofrece un reproductor de YouTube compatible.",
+        "Reprodução integrada ao Companion" to "Reproducción integrada en Companion",
+        "Assistir no app" to "Ver en la aplicación",
+        "Foto aplicada neste dispositivo. Não precisa salvar o perfil." to "Foto guardada en este dispositivo. No necesitas guardar el perfil.",
+        "Foto aplicada neste dispositivo. Salve o perfil para sincronizar a imagem da conta." to "Foto aplicada en este dispositivo. Guarda el perfil para sincronizarla con tu cuenta.",
+        "Foto aplicada neste dispositivo. A imagem ficará salva localmente." to "Foto aplicada en este dispositivo. La imagen quedará guardada localmente.",
+        "Foto removida." to "Foto eliminada.",
+        "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP." to "No se pudo leer la foto. Prueba con una imagen JPG, PNG o WebP.",
+        "Foto salva neste dispositivo" to "Foto guardada en este dispositivo",
+        "Foto local removida." to "Foto local eliminada.",
+        "Seu catálogo" to "Tu catálogo",
+        "Ver jogo" to "Ver juego",
+        "Nenhum jogo corresponde à busca." to "Ningún juego coincide con la búsqueda.",
     )
 
     fun translate(context: Context, value: String): String {
-        val language = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
+        val saved = runCatching {
+            context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE).getString("app_language", "").orEmpty()
+        }.getOrDefault("")
+        val systemLanguage = runCatching { context.resources.configuration.locales[0]?.language }.getOrNull()
             ?: Locale.getDefault().language
+        val language = saved.ifBlank { systemLanguage }
         return translate(language, value)
     }
 

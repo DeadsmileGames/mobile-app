@@ -125,7 +125,10 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
     val image = resolveAssetUrl(o.firstText(
         "coverImage", "cover_image", "image", "thumbnail", "thumbnail_url", "thumbnailUrl",
         "heroImage", "hero_image", "bannerImage", "banner_image", "poster", "cover", "icon"
-    ))
+    )) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
+        // Official artwork fallback from the game's current itch.io listing; never substitute another game's art.
+        "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
+    } else null
     val rawBody = o.firstText(
         "body", "content", "contentHtml", "content_html", "html", "articleBody",
         "article_body", "fullDescription", "full_description", "description", "excerpt"

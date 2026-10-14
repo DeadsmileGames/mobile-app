@@ -3,6 +3,7 @@ package games.deadsmile.mobile
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +47,7 @@ import java.util.Locale
 
 @Composable
 fun UpdatesScreen(
+    pad: PaddingValues,
     releases: List<GitHubRelease>,
     loading: Boolean,
     error: String?,
@@ -61,7 +63,7 @@ fun UpdatesScreen(
     val context = LocalContext.current
     val locale = runCatching { context.resources.configuration.locales[0] }.getOrNull() ?: Locale.getDefault()
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxSize().padding(pad).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Card(

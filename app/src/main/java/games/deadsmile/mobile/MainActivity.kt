@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,7 +21,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -30,11 +34,16 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,10 +83,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -106,7 +117,8 @@ import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
     HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
-    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações")
+    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações"),
+    NOTIFICATIONS("Notificações"), VIDEO_PLAYER("Reprodutor")
 }
 
 private val BrandInk = Color(0xFF101010)
@@ -158,6 +170,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent { DeadsmileApp() }
     }
 }
@@ -174,6 +188,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
+    var appLanguage by rememberSaveable { mutableStateOf(prefs.getString("app_language", "").orEmpty()) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (themeMode) { 1 -> false; 2, 3 -> true; else -> systemDark }
     val scheme = when {
@@ -212,7 +227,9 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
                 reduceMotion = reduceMotion,
-                onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() }
+                onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() },
+                appLanguage = appLanguage,
+                onAppLanguage = { language -> appLanguage = language; prefs.edit().putString("app_language", language).apply() }
             )
         }
     }
@@ -227,10 +244,13 @@ private fun DeadsmileRoot(
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
     reduceMotion: Boolean,
-    onReduceMotion: (Boolean) -> Unit
+    onReduceMotion: (Boolean) -> Unit,
+    appLanguage: String,
+    onAppLanguage: (String) -> Unit
 ) {
     val state by vm.state.collectAsState()
     var page by rememberSaveable { mutableStateOf(Page.HOME) }
+    var videoItem by remember { mutableStateOf<FeedItem?>(null) }
     var returnPage by rememberSaveable { mutableStateOf(Page.HOME) }
     var detailItem by remember { mutableStateOf<FeedItem?>(null) }
     var detailIsGame by remember { mutableStateOf(false) }
@@ -342,8 +362,16 @@ private fun DeadsmileRoot(
         if (updateBusyVersion == null) beginUpdateDownload(newest)
     }
 
-    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
-        page = if (page == Page.GAMES) Page.HOME else returnPage
+    BackHandler(enabled = page != Page.HOME && tourStage < 0) {
+        page = when (page) {
+            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS, Page.VIDEO_PLAYER -> returnPage.takeIf { it != page } ?: Page.HOME
+            else -> Page.HOME
+        }
+    }
+
+    if (appLanguage.isBlank()) {
+        LanguageSelectionOverlay(onSelect = onAppLanguage)
+        return
     }
 
     Scaffold(
@@ -369,24 +397,31 @@ private fun DeadsmileRoot(
                             Page.SETTINGS -> "Configurações"
                             Page.DETAILS -> "Detalhes"
                             Page.UPDATES -> "Atualizações"
+                            Page.NOTIFICATIONS -> "Notificações"
+                            Page.VIDEO_PLAYER -> "Reproduzindo"
                         }
                         Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
-                        IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS || page == Page.VIDEO_PLAYER) {
+                        IconButton(onClick = { page = when (page) { Page.GAMES -> Page.HOME; else -> returnPage.takeIf { it != page } ?: Page.HOME } }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
-                    if (tourStage < 0) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
+                        IconButton(onClick = { returnPage = page; page = Page.NOTIFICATIONS }) {
+                            Icon(Icons.Default.Notifications, contentDescription = AppI18n.translate(LocalContext.current, "Notificações"))
+                        }
+                    }
+                    if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
                         IconButton(onClick = {
                             when (page) {
                                 Page.ACCOUNT -> vm.account()
@@ -400,7 +435,7 @@ private fun DeadsmileRoot(
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && tourStage != 6) {
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER && tourStage != 6) {
                 val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
                 FloatingDock(
                     page = page,
@@ -434,10 +469,16 @@ private fun DeadsmileRoot(
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { pad ->
-        val duration = if (reduceMotion) 0 else 220
-        Crossfade(
+        AnimatedContent(
             targetState = page,
-            animationSpec = tween(durationMillis = duration),
+            transitionSpec = {
+                if (reduceMotion) {
+                    fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                } else {
+                    (fadeIn(tween(180)) + slideInVertically(tween(220)) { height -> height / 28 }) togetherWith
+                        (fadeOut(tween(140)) + slideOutVertically(tween(160)) { height -> -height / 40 })
+                }
+            },
             label = "deadsmile-page"
         ) { targetPage ->
             when (targetPage) {
@@ -448,19 +489,17 @@ private fun DeadsmileRoot(
                     openStory = { item -> detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS },
                     openCatalog = { returnPage = Page.HOME; page = Page.GAMES }
                 )
-                Page.GAMES -> FeedScreen("Catálogo de jogos", state.games, state.loading, pad) { item ->
+                Page.GAMES -> GameCatalogScreen(state.games, state.loading, pad) { item ->
                     detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS
                 }
                 Page.NEWS -> FeedScreen("Últimas notícias", state.news, state.loading, pad) {
                     detailItem = it; detailIsGame = false; returnPage = page; page = Page.DETAILS
                 }
                 Page.VIDEOS -> FeedScreen("Vídeos", state.videos, state.loading, pad) { item ->
-                    val url = item.url
-                    if (url != null) openExternal(context, url) else {
-                        detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS
-                    }
+                    if (item.url != null && youtubeVideoId(item.url) != null) { videoItem = item; returnPage = Page.VIDEOS; page = Page.VIDEO_PLAYER }
+                    else { detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS }
                 }
-                Page.LIBRARY -> LibraryScreen(state, pad) { page = Page.ACCOUNT }
+                Page.LIBRARY -> LibraryScreen(state, pad, goAccount = { page = Page.ACCOUNT }, openGame = { item -> detailItem = item; detailIsGame = true; returnPage = Page.LIBRARY; page = Page.DETAILS })
                 Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.ACCOUNT; page = Page.WISHLIST }
                 Page.WISHLIST -> WishlistScreen(
                     state = state,
@@ -470,12 +509,17 @@ private fun DeadsmileRoot(
                     remove = vm::removeWishlist
                 )
                 Page.SETTINGS -> SettingsScreen(
+                    pad = pad,
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
                     reduceMotion = reduceMotion, onReduceMotion = onReduceMotion,
+                    appLanguage = appLanguage, onAppLanguage = onAppLanguage,
                     onOpenUpdates = { returnPage = Page.SETTINGS; page = Page.UPDATES }
                 )
+                Page.NOTIFICATIONS -> NotificationsScreen(pad)
+                Page.VIDEO_PLAYER -> videoItem?.let { VideoPlayerScreen(it, pad) } ?: run { page = Page.VIDEOS }
                 Page.UPDATES -> UpdatesScreen(
+                    pad = pad,
                     releases = releases,
                     loading = releasesLoading,
                     error = releaseError,
@@ -503,7 +547,7 @@ private fun DeadsmileRoot(
                         onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
                         onOpenExternal = { url -> openExternal(context, url) },
-                        onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
+                        onOpenVideo = { displayItem.url?.let { url -> if (youtubeVideoId(url) != null) { videoItem = displayItem; returnPage = Page.DETAILS; page = Page.VIDEO_PLAYER } else openExternal(context, url) } }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
             }
@@ -669,21 +713,31 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
-    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-                item(key = "companion-welcome") {
-                    Card(Modifier.width(320.dp).height(300.dp), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text("Catálogo de jogos, newswire, vídeos e biblioteca para PC.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(Modifier.weight(1f))
-                            Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Explorar jogos") }
-                            OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Newswire") }
+            val hero = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) } ?: state.games.firstOrNull()
+            Card(Modifier.fillMaxWidth().height(310.dp), shape = RoundedCornerShape(28.dp)) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    hero?.let { GameArtwork(it, Modifier.fillMaxSize()) }
+                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))))
+                    Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("DEADSMILE GAMES", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .88f), fontWeight = FontWeight.Bold)
+                        Text(hero?.title ?: "Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(hero?.summary ?: "Jogos, notícias e novidades da Deadsmile.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .88f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { if (hero != null) openGame(hero) else openCatalog() }) { Text("Ver jogo") }
+                            OutlinedButton(onClick = openCatalog, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("Explorar catálogo") }
                         }
                     }
                 }
-                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes", compact = true) { openGame(game) } }
+            }
+        }
+        item {
+            Section("Seu catálogo", if (state.games.isEmpty()) "" else "Ver todos", openCatalog)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+                items(state.games.take(12), key = { "home-game-" + it.id }) { game ->
+                    FeedCard(game, Modifier.width(178.dp).height(276.dp), "Detalhes", compact = true) { openGame(game) }
+                }
             }
         }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
@@ -753,40 +807,67 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
         if (filtered.isEmpty()) {
             item { Empty("Nenhum resultado para essa busca. Tente outro termo.") }
         } else {
-            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth()) { open(item) } }
+            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth().height(292.dp)) { open(item) } }
+        }
+    }
+}
+
+private const val ABBY_OFFICIAL_ARTWORK = "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
+
+@Composable
+private fun GameArtwork(item: FeedItem, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
+    val isAbby = item.title.contains("abby", true) && item.title.contains("restless", true)
+    var useOfficialFallback by remember(item.id, item.image) { mutableStateOf(item.image.isNullOrBlank() && isAbby) }
+    val model = if (useOfficialFallback) ABBY_OFFICIAL_ARTWORK else item.image
+    if (model == null) {
+        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    SubcomposeAsyncImage(model = model, contentDescription = item.title, modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentScale = contentScale) {
+        when {
+            painter.state is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+            painter.state is AsyncImagePainter.State.Error && isAbby && !useOfficialFallback -> {
+                LaunchedEffect(item.id, item.image) { useOfficialFallback = true }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
+            painter.state is AsyncImagePainter.State.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
         }
     }
 }
 
 @Composable
 private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "feed-card-press"
+    )
     Card(
-        modifier = modifier.clickable(onClick = open),
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clickable(interactionSource = interaction, indication = null, onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
-        Column {
-            if (item.image != null) {
-                Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                    SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                        if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        } else SubcomposeAsyncImageContent()
-                    }
-                }
-            } else {
-                Box(
-                    Modifier.fillMaxWidth().height(if (compact) 106.dp else 112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 136.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                GameArtwork(item, Modifier.fillMaxSize())
             }
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.fillMaxWidth().weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
-                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3)
-                if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (!compact && item.status.isNotBlank()) 1 else 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
+                if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -812,16 +893,8 @@ private fun GameDetailsScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                item.image?.let { image ->
-                    SubcomposeAsyncImage(model = image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                        if (painter.state is AsyncImagePainter.State.Success) {
-                            SubcomposeAsyncImageContent()
-                        } else {
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
+                GameArtwork(item, Modifier.fillMaxSize())
+                if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) {
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
@@ -829,7 +902,12 @@ private fun GameDetailsScreen(
                     ))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) Color.White else MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
@@ -908,7 +986,7 @@ private fun GameDetailsScreen(
                     }
                 }
                 if (!isGame) {
-                    if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Abrir conteúdo") }
+                    if (item.url != null) Button(onClick = onOpenVideo, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Assistir no app") }
                     OutlinedButton(onClick = onOpenSite, modifier = Modifier.fillMaxWidth()) { Text("Visitar Deadsmile Games") }
                 }
             }
@@ -1069,7 +1147,7 @@ private fun WishlistScreen(
 }
 
 @Composable
-private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> Unit) {
+private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> Unit, openGame: (FeedItem) -> Unit) {
     if (state.user == null) {
         Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) {
             Card(shape = RoundedCornerShape(24.dp)) {
@@ -1101,7 +1179,7 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
                 Text("Jogos vinculados à sua conta · somente consulta", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             items(state.library, key = { it.id }) { game ->
-                Card(shape = RoundedCornerShape(20.dp)) {
+                Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { openGame(game) }) {
                     Row(
                         Modifier.fillMaxWidth().padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1142,16 +1220,26 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var avatarUrl by rememberSaveable { mutableStateOf("") }
     var avatarUrlInput by rememberSaveable { mutableStateOf("") }
     var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val avatarPrefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    val avatarPreferenceKey = remember(state.user?.email, state.user?.username) {
+        "local_avatar_path_" + (state.user?.email.orEmpty().ifBlank { state.user?.username.orEmpty() }.lowercase(java.util.Locale.ROOT).hashCode())
+    }
+    var localAvatarPath by rememberSaveable(avatarPreferenceKey) { mutableStateOf(avatarPrefs.getString(avatarPreferenceKey, null)) }
+    var localAvatarUpload by remember { mutableStateOf("") }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
-    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val encoded = runCatching { encodeProfileImage(context, uri) }.getOrNull()
-        if (encoded.isNullOrBlank()) {
-            avatarPickerMessage = "Não foi possível usar essa imagem. Escolha outra foto."
-        } else {
-            avatarUrl = encoded
-            avatarUrlInput = ""
-            avatarPickerMessage = "Foto selecionada. Salve o perfil para aplicar."
+        val saved = runCatching { copyProfileImage(context, uri) }.getOrNull()
+        if (saved == null) avatarPickerMessage = "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP."
+        else {
+            localAvatarPath = saved.absolutePath
+            avatarPrefs.edit().putString(avatarPreferenceKey, saved.absolutePath).apply()
+            localAvatarUpload = runCatching { encodeProfileImage(context, Uri.fromFile(saved)) }.getOrNull().orEmpty()
+            avatarPickerMessage = if (localAvatarUpload.isNotBlank()) {
+                "Foto aplicada neste dispositivo. Salve o perfil para sincronizar a imagem da conta."
+            } else {
+                "Foto aplicada neste dispositivo. A imagem ficará salva localmente."
+            }
         }
     }
     var showEmailForm by rememberSaveable { mutableStateOf(false) }
@@ -1188,7 +1276,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             Card(shape = RoundedCornerShape(26.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        AccountAvatar(profile?.avatarUrl, Modifier.size(68.dp))
+                        AccountAvatar(localAvatarPath?.let { Uri.fromFile(File(it)).toString() } ?: profile?.avatarUrl, Modifier.size(68.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(profile?.fullName?.ifBlank { state.user.username } ?: state.user.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text("@" + (profile?.username?.ifBlank { state.user.username } ?: state.user.username), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1210,8 +1298,15 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedButton(onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick = { avatarPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
+                        }
+                        if (localAvatarPath != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                AccountAvatar(Uri.fromFile(File(localAvatarPath!!)).toString(), Modifier.size(54.dp))
+                                Text("Foto salva neste dispositivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { File(localAvatarPath!!).delete(); localAvatarPath = null; avatarPrefs.edit().remove(avatarPreferenceKey).apply(); localAvatarUpload = ""; avatarUrl = ""; avatarUrlInput = ""; avatarPickerMessage = "Foto removida."; vm.saveProfile(username, profileBio, websiteUrl, location, "") }, enabled = !state.busy) { Text("Remover") }
+                            }
                         }
                         if (avatarUrl.startsWith("data:image/")) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1222,7 +1317,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
-                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
+                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, localAvatarUpload.ifBlank { avatarUrlInput }); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
@@ -1364,17 +1459,14 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
         return
     }
 
-    val images = remember(state.games, state.news, state.videos) {
-        (
-            state.games.flatMap { it.screenshots } +
-                state.games.mapNotNull { it.image } +
-                state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
-                state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
-            ).distinct().take(18)
-            
+    val images = remember(state.games) {
+        val abby = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) }
+        (abby?.screenshots.orEmpty().take(10) + listOfNotNull(abby?.image) + ABBY_OFFICIAL_ARTWORK).distinct()
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
-    LaunchedEffect(images) {
+    var imageFallbackLocked by remember(images) { mutableStateOf(false) }
+    LaunchedEffect(images, imageFallbackLocked) {
+        if (imageFallbackLocked) return@LaunchedEffect
         while (images.isNotEmpty()) {
             delay(3000)
             imageIndex = (imageIndex + 1) % images.size
@@ -1394,8 +1486,17 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 ) {
-                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
-                    else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    if (painter.state is AsyncImagePainter.State.Success) {
+                        SubcomposeAsyncImageContent()
+                    } else if (painter.state is AsyncImagePainter.State.Error && index < images.lastIndex) {
+                        LaunchedEffect(index, images) {
+                            imageFallbackLocked = true
+                            imageIndex = images.lastIndex
+                        }
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    } else {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    }
                 }
             }
         }
@@ -1519,19 +1620,54 @@ private fun decodeProfileImage(value: String?): Bitmap? {
     return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
 }
 
-private fun encodeProfileImage(context: Context, uri: Uri): String? {
+private fun decodeProfileBitmap(context: Context, uri: Uri, maxDimension: Int): Bitmap? {
     val resolver = context.contentResolver
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val modern = runCatching {
+            val source = ImageDecoder.createSource(resolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
+                val longest = maxOf(info.size.width, info.size.height)
+                decoder.setTargetSampleSize((longest / maxDimension).coerceAtLeast(1))
+            }
+        }.getOrNull()
+        if (modern != null) return modern
+        // Fall back to BitmapFactory for unusual files not supported by this device's ImageDecoder.
+    }
+
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sampleSize = 1
-    while (bounds.outWidth / sampleSize > 640 || bounds.outHeight / sampleSize > 640) sampleSize *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
-    val scaled = if (decoded.width > 512 || decoded.height > 512) {
-        val ratio = minOf(512f / decoded.width, 512f / decoded.height)
-        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
-    } else decoded
+    var sample = 1
+    while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension) sample *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return runCatching { resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } }.getOrNull()
+}
+
+private fun scaleProfileBitmap(decoded: Bitmap, maxDimension: Int): Bitmap {
+    if (decoded.width <= maxDimension && decoded.height <= maxDimension) return decoded
+    val ratio = minOf(maxDimension.toFloat() / decoded.width, maxDimension.toFloat() / decoded.height)
+    return Bitmap.createScaledBitmap(
+        decoded,
+        (decoded.width * ratio).toInt().coerceAtLeast(1),
+        (decoded.height * ratio).toInt().coerceAtLeast(1),
+        true
+    )
+}
+
+private fun copyProfileImage(context: Context, uri: Uri): File? {
+    val decoded = decodeProfileBitmap(context, uri, 1024) ?: return null
+    val scaled = scaleProfileBitmap(decoded, 768)
+    val destination = File(context.filesDir, "profile-avatar.jpg")
+    val ok = runCatching { destination.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) } }.getOrDefault(false)
+    if (scaled !== decoded) scaled.recycle()
+    decoded.recycle()
+    return destination.takeIf { ok && it.isFile && it.length() > 0L }
+}
+
+private fun encodeProfileImage(context: Context, uri: Uri): String? {
+    val decoded = decodeProfileBitmap(context, uri, 640) ?: return null
+    val scaled = scaleProfileBitmap(decoded, 512)
     val stream = ByteArrayOutputStream()
     var quality = 84
     do {
@@ -1547,22 +1683,39 @@ private fun encodeProfileImage(context: Context, uri: Uri): String? {
 
 @Composable
 private fun SettingsScreen(
+    pad: PaddingValues,
     themeMode: Int,
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit,
+    appLanguage: String,
+    onAppLanguage: (String) -> Unit,
     onOpenUpdates: () -> Unit
 ) {
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().padding(pad),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
             Text("Personalize sua experiência", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text("Deixe o app do seu jeito. As mudanças são aplicadas na hora.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Idioma", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("O idioma é aplicado em todo o app.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    listOf("pt-BR" to "Português", "en" to "English", "es" to "Español").forEach { (code, label) ->
+                        Row(Modifier.fillMaxWidth().clickable { onAppLanguage(code) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = appLanguage == code, onClick = { onAppLanguage(code) })
+                            Text(label, Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
         item {
             Card(shape = RoundedCornerShape(22.dp)) {
@@ -1731,5 +1884,157 @@ private fun openExternal(context: Context, value: String) {
         require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank() && uri.userInfo.isNullOrEmpty())
         val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
+    }
+}
+
+
+private fun youtubeVideoId(url: String): String? {
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+    val host = uri.host?.lowercase().orEmpty()
+    val candidate = when {
+        host == "youtu.be" -> uri.lastPathSegment
+        host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com") ->
+            if (uri.path == "/watch") uri.getQueryParameter("v") else {
+                val segments = uri.pathSegments
+                when (segments.firstOrNull()) { "embed", "shorts", "live" -> segments.getOrNull(1); else -> null }
+            }
+        else -> null
+    }?.trim()
+    return candidate?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{6,20}")) }
+}
+
+@Composable
+private fun VideoPlayerScreen(item: FeedItem, pad: PaddingValues) {
+    val videoId = remember(item.url) { item.url?.let(::youtubeVideoId) }
+    Column(
+        Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(item.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (videoId == null) {
+            Empty("Este conteúdo não oferece um player do YouTube compatível.")
+        } else {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp)),
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = true
+                        settings.javaScriptCanOpenWindowsAutomatically = false
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl("https://www.youtube-nocookie.com/embed/" + videoId + "?playsinline=1&rel=0")
+                    }
+                },
+                update = { view ->
+                    val expected = "https://www.youtube-nocookie.com/embed/" + videoId + "?playsinline=1&rel=0"
+                    if (view.url != expected) view.loadUrl(expected)
+                }
+            )
+            Text("Reprodução integrada ao Companion", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            if (item.summary.isNotBlank()) Text(item.summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.76f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 420.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Escolha seu idioma", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Você pode mudar isso depois nas configurações.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = { onSelect("pt-BR") }, modifier = Modifier.fillMaxWidth()) { Text("Português (Brasil)") }
+                OutlinedButton(onClick = { onSelect("en") }, modifier = Modifier.fillMaxWidth()) { Text("English") }
+                OutlinedButton(onClick = { onSelect("es") }, modifier = Modifier.fillMaxWidth()) { Text("Español") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(content, query) {
+        val q = query.trim()
+        if (q.isBlank()) content else content.filter {
+            it.title.contains(q, true) || it.summary.contains(q, true) || it.genres.any { g -> g.contains(q, true) }
+        }
+    }
+    if (loading && content.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    Column(Modifier.fillMaxSize().padding(pad)) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            placeholder = { Text("Buscar jogos") }, singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = { if (query.isNotBlank()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "Limpar busca") } }
+        )
+        if (filtered.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) { Empty(if (content.isEmpty()) "O catálogo não está disponível agora. Tente atualizar em alguns instantes." else "Nenhum jogo corresponde à busca.") }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 156.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                gridItems(filtered, key = { it.id }) { game ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().height(276.dp).clickable { open(game) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        Column(Modifier.fillMaxSize()) {
+                            Box(Modifier.fillMaxWidth().height(156.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                                GameArtwork(game, Modifier.fillMaxSize())
+                            }
+                            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(game.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(game.summary.ifBlank { game.genres.take(2).joinToString(" · ") }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Spacer(Modifier.weight(1f))
+                                Text("Ver detalhes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsScreen(pad: PaddingValues) {
+    val context = LocalContext.current
+    var notifications by remember { mutableStateOf(games.deadsmile.mobile.data.LocalNotificationStore.load(context)) }
+    Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Notificações", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Salvas neste dispositivo", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = { games.deadsmile.mobile.data.LocalNotificationStore.clear(context); notifications = emptyList() }, enabled = notifications.isNotEmpty()) { Text("Limpar") }
+        }
+        if (notifications.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Empty("Você ainda não tem notificações. As novidades aparecerão aqui.") }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                items(notifications, key = { it.id }) { notice ->
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(15.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                            Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text(notice.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(notice.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                                Text(java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(notice.timestamp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
