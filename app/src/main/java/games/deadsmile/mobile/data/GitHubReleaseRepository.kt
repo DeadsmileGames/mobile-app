@@ -183,7 +183,7 @@ object GitHubReleaseRepository {
     suspend fun download(context: Context, release: GitHubRelease, onProgress: suspend (Int) -> Unit): File =
         withContext(Dispatchers.IO) {
             val url = release.apkUrl ?: throw IOException("Esta release não contém um APK.")
-            if (!isTrustedApkUrl(url)) throw IOException("O link do APK não pertence às releases oficiais do Companion.")
+            if (!isTrustedApkUrl(url)) throw IOException("O link do APK não pertence às releases oficiais de Deadsmile Games.")
             if (release.apkSize > MAX_APK_BYTES) throw IOException("O APK ultrapassa o tamanho máximo permitido.")
 
             val request = Request.Builder()
