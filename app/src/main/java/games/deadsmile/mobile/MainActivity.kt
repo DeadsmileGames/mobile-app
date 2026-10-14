@@ -689,10 +689,10 @@ private fun GameAvailabilityCard(item: FeedItem) {
         val minutes = (total % 3_600L) / 60L
         val seconds = total % 60L
         listOfNotNull(
-            days.takeIf { it > 0 }?.let { "\${it}d" },
-            hours.takeIf { days > 0 || it > 0 }?.let { "\${it}h" },
-            minutes.takeIf { days > 0 || hours > 0 || it > 0 }?.let { "\${it}m" },
-            seconds.takeIf { days == 0L && hours == 0L && minutes == 0L }?.let { "\${it}s" }
+            days.takeIf { it > 0 }?.let { "${it}d" },
+            hours.takeIf { days > 0 || it > 0 }?.let { "${it}h" },
+            minutes.takeIf { days > 0 || hours > 0 || it > 0 }?.let { "${it}m" },
+            seconds.takeIf { days == 0L && hours == 0L && minutes == 0L }?.let { "${it}s" }
         ).joinToString(" ")
     } else null
     val released = item.status.equals("released", true)
@@ -718,10 +718,10 @@ private fun GameAvailabilityCard(item: FeedItem) {
                     released -> "O jogo está marcado como publicado, mas a API não confirma um download configurado. Consulte os canais oficiais."
                     inDevelopment && countdown != null -> "Lançamento previsto em $countdown."
                     inDevelopment && item.releaseDate.isNotBlank() && target != null && target <= now -> "A data prevista passou, mas o catálogo ainda marca o jogo como em desenvolvimento."
-                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: \${item.releaseDate.take(10)}."
+                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
                     inDevelopment -> "Ainda não há uma data de lançamento publicada."
                     announced && countdown != null -> "Anunciado. Lançamento previsto em $countdown."
-                    announced && item.releaseDate.isNotBlank() -> "Data prevista: \${item.releaseDate.take(10)}."
+                    announced && item.releaseDate.isNotBlank() -> "Data prevista: ${item.releaseDate.take(10)}."
                     announced -> "O jogo foi anunciado, mas a data de lançamento ainda não foi divulgada."
                     else -> "Não há dados suficientes para confirmar a disponibilidade deste jogo. Consulte o site oficial."
                 }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
