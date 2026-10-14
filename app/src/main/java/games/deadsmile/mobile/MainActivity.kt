@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -93,19 +96,20 @@ import games.deadsmile.mobile.data.AppViewModel
 import games.deadsmile.mobile.data.FeedItem
 import games.deadsmile.mobile.data.UiState
 import games.deadsmile.mobile.data.PrivacyOptions
+import games.deadsmile.mobile.data.GitHubRelease
+import games.deadsmile.mobile.data.GitHubReleaseRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
-    HOME("Início"), GAMES("Jogos"), NEWS("Notícias"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
-    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes")
+    HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
+    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações")
 }
 
-private val BrandInk = Color(0xFF111019)
-private val BrandViolet = Color(0xFF8173FF)
-private val BrandRose = Color(0xFFFF647C)
-private const val ReferenceArtwork = "https://cdn2.unrealengine.com/egs-1920x1080-faee3c527bb1.jpg"
+private val BrandInk = Color(0xFF101010)
 
 @Composable
 private fun Text(
@@ -151,6 +155,7 @@ private fun Text(
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { DeadsmileApp() }
@@ -168,23 +173,34 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
     }
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
-    var accentPalette by rememberSaveable { mutableIntStateOf(prefs.getInt("accent_palette", 0).coerceIn(0, 3)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (themeMode) { 1 -> false; 2, 3 -> true; else -> systemDark }
     val scheme = when {
-        themeMode == 3 -> darkColorScheme(primary = Color(0xFFB8AEFF), secondary = Color(0xFFFF9DB0), tertiary = Color(0xFF91D9D0), background = Color.Black, surface = Color.Black, surfaceVariant = Color(0xFF0C0C10), surfaceContainerLow = Color(0xFF050507), surfaceContainer = Color(0xFF09090C), surfaceContainerHigh = Color(0xFF101014), surfaceContainerHighest = Color(0xFF17171C), outlineVariant = Color(0xFF34343A))
+        themeMode == 3 && Build.VERSION.SDK_INT >= 31 -> dynamicDarkColorScheme(context).copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceVariant = Color(0xFF080808),
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color.Black,
+            surfaceContainer = Color(0xFF050505),
+            surfaceContainerHigh = Color(0xFF0B0B0B),
+            surfaceContainerHighest = Color(0xFF141414)
+        )
+        themeMode == 3 -> darkColorScheme(
+            primary = Color(0xFFE2E2E2), secondary = Color(0xFFC8C8C8), tertiary = Color(0xFFAAAAAA),
+            background = Color.Black, surface = Color.Black, surfaceVariant = Color(0xFF080808),
+            surfaceContainerLowest = Color.Black, surfaceContainerLow = Color.Black,
+            surfaceContainer = Color(0xFF050505), surfaceContainerHigh = Color(0xFF0B0B0B),
+            surfaceContainerHighest = Color(0xFF141414)
+        )
         Build.VERSION.SDK_INT >= 31 && dynamicColors && dark -> dynamicDarkColorScheme(context)
         Build.VERSION.SDK_INT >= 31 && dynamicColors -> dynamicLightColorScheme(context)
         dark -> darkColorScheme(
-            primary = listOf(Color(0xFFB8AEFF), Color(0xFFFF9DB0), Color(0xFF8AD8CF), Color(0xFF9CBFFF))[accentPalette],
-            secondary = listOf(Color(0xFFFF91A2), Color(0xFFB8AEFF), Color(0xFFFFB3C0), Color(0xFF91D9D0))[accentPalette],
-            tertiary = Color(0xFF91D9D0)
+            primary = Color(0xFFD8D8D8), secondary = Color(0xFFBFBFBF), tertiary = Color(0xFFA5A5A5)
         )
         else -> lightColorScheme(
-            primary = listOf(Color(0xFF5B4BCC), Color(0xFFB4234F), Color(0xFF176B65), Color(0xFF2458B8))[accentPalette],
-            secondary = listOf(Color(0xFFB4234F), Color(0xFF5B4BCC), Color(0xFF8C3655), Color(0xFF176B65))[accentPalette],
-            tertiary = Color(0xFF176B65)
+            primary = Color(0xFF454545), secondary = Color(0xFF626262), tertiary = Color(0xFF777777)
         )
     }
     MaterialTheme(colorScheme = scheme) {
@@ -195,12 +211,6 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 onThemeMode = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
-                accentPalette = accentPalette,
-                onAccentPalette = {
-                    accentPalette = it.coerceIn(0, 3)
-                    dynamicColors = false
-                    prefs.edit().putInt("accent_palette", accentPalette).putBoolean("dynamic_colors", false).apply()
-                },
                 reduceMotion = reduceMotion,
                 onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() }
             )
