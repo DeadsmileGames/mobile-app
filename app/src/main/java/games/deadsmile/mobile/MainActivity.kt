@@ -102,14 +102,23 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
     val prefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
+    var accentPalette by rememberSaveable { mutableIntStateOf(prefs.getInt("accent_palette", 0).coerceIn(0, 3)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (themeMode) { 1 -> false; 2 -> true; else -> systemDark }
     val scheme = when {
         Build.VERSION.SDK_INT >= 31 && dynamicColors && dark -> dynamicDarkColorScheme(context)
         Build.VERSION.SDK_INT >= 31 && dynamicColors -> dynamicLightColorScheme(context)
-        dark -> darkColorScheme(primary = Color(0xFFB8AEFF), secondary = Color(0xFFFF91A2), tertiary = Color(0xFF91D9D0))
-        else -> lightColorScheme(primary = Color(0xFF5B4BCC), secondary = Color(0xFFB4234F), tertiary = Color(0xFF176B65))
+        dark -> darkColorScheme(
+            primary = listOf(Color(0xFFB8AEFF), Color(0xFFFF9DB0), Color(0xFF8AD8CF), Color(0xFF9CBFFF))[accentPalette],
+            secondary = listOf(Color(0xFFFF91A2), Color(0xFFB8AEFF), Color(0xFFFFB3C0), Color(0xFF91D9D0))[accentPalette],
+            tertiary = Color(0xFF91D9D0)
+        )
+        else -> lightColorScheme(
+            primary = listOf(Color(0xFF5B4BCC), Color(0xFFB4234F), Color(0xFF176B65), Color(0xFF2458B8))[accentPalette],
+            secondary = listOf(Color(0xFFB4234F), Color(0xFF5B4BCC), Color(0xFF8C3655), Color(0xFF176B65))[accentPalette],
+            tertiary = Color(0xFF176B65)
+        )
     }
     MaterialTheme(colorScheme = scheme) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -119,6 +128,12 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 onThemeMode = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
+                accentPalette = accentPalette,
+                onAccentPalette = {
+                    accentPalette = it.coerceIn(0, 3)
+                    dynamicColors = false
+                    prefs.edit().putInt("accent_palette", accentPalette).putBoolean("dynamic_colors", false).apply()
+                },
                 reduceMotion = reduceMotion,
                 onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() }
             )
@@ -134,6 +149,8 @@ private fun DeadsmileRoot(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
+    accentPalette: Int,
+    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit
 ) {
@@ -240,6 +257,7 @@ private fun DeadsmileRoot(
                 Page.SETTINGS -> SettingsScreen(
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
+                    accentPalette = accentPalette, onAccentPalette = onAccentPalette,
                     reduceMotion = reduceMotion, onReduceMotion = onReduceMotion
                 )
                 Page.DETAILS -> detailItem?.let { item ->
@@ -1019,6 +1037,8 @@ private fun SettingsScreen(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
+    accentPalette: Int,
+    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit
 ) {
@@ -1051,6 +1071,24 @@ private fun SettingsScreen(
                         checked = dynamicColors,
                         onCheckedChange = onDynamicColors
                     )
+                    Text("Cor de destaque", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    val swatches = listOf(
+                        Triple("Violeta", Color(0xFF5B4BCC), Color(0xFFB8AEFF)),
+                        Triple("Rosa", Color(0xFFB4234F), Color(0xFFFF9DB0)),
+                        Triple("Verde-água", Color(0xFF176B65), Color(0xFF8AD8CF)),
+                        Triple("Azul", Color(0xFF2458B8), Color(0xFF9CBFFF))
+                    )
+                    swatches.forEachIndexed { index, palette ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onAccentPalette(index) }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            RadioButton(selected = accentPalette == index && !dynamicColors, onClick = { onAccentPalette(index) })
+                            Box(Modifier.size(26.dp).clip(CircleShape).background(if (themeMode == 2) palette.third else palette.second))
+                            Text(palette.first, Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         }
