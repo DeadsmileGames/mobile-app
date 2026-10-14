@@ -1,63 +1,107 @@
-# Deadsmile Mobile
+<p align="center">
+  <img src="https://raw.githubusercontent.com/deadsmilegames/launcher/main/public/readme.png" width="120px" alt="Deadsmile Games">
+</p>
 
-Aplicativo Android **nativo** da Deadsmile Games, desenvolvido em **Kotlin**, **Jetpack Compose** e **Material 3 (Material You)**.
+<h3 align="center">
 
-## Recursos
+`Deadsmile Games for Android`
 
-- Notícias e feed editorial da Deadsmile Games.
-- Catálogo de vídeos.
-- Catálogo de jogos.
-- Biblioteca da conta autenticada em modo somente leitura: mostra os jogos da biblioteca, sem executar jogos no celular.
-- Gerenciamento de conta e autenticação.
-- Cores dinâmicas do Android 12+, com suporte aos temas claro e escuro.
-- Tráfego HTTPS obrigatório e sem tráfego cleartext.
-- Sessão armazenada usando Android Keystore; operações mutáveis autenticadas devem incluir proteção CSRF.
+</h3>
 
-## API
+<p align="center">
+  <img src="https://img.shields.io/badge/STATUS-ANDROID%20RELEASE-gold" alt="Status: Android release">
+  <img src="https://img.shields.io/badge/VERSION-1.1.0-gold" alt="Version 1.1.0">
+  <img src="https://img.shields.io/badge/PLATFORM-ANDROID-green" alt="Platform: Android">
+  <img src="https://img.shields.io/badge/TECH-Kotlin%20%7C%20Jetpack%20Compose-blue" alt="Kotlin and Jetpack Compose">
+  <img src="https://img.shields.io/badge/DISTRIBUTION-APK%20%2B%20AAB-lightgrey" alt="APK and Android App Bundle">
+</p>
 
-API base: `https://api-ust8.onrender.com/api`
+<p align="center">
+  A native Android app for discovering Deadsmile Games, reading news, viewing videos, and accessing account-linked game content.
+</p>
 
-O app utiliza os endpoints disponíveis para notícias, vídeos, catálogo, biblioteca e conta. A biblioteca móvel é somente leitura.
+<p align="center">
+  <a href="https://deadsmilegames.vercel.app">Website</a>
+  •
+  <a href="https://deadsmilegames.vercel.app">Games</a>
+  •
+  <a href="https://github.com/DeadsmileGames/mobile-app/releases/latest">Releases</a>
+  •
+  <a href="https://github.com/DeadsmileGames/mobile-app/issues">Issues</a>
+</p>
 
-## Build e APK
+## About
 
-O workflow [Android APK](https://github.com/DeadsmileGames/mobile-app/actions/workflows/android-apk.yml) executa testes unitários, compila o APK debug e publica `app-debug.apk` como artefato do GitHub Actions.
+Deadsmile Games for Android is built with **Kotlin, Jetpack Compose, and Material 3**. It connects to the Deadsmile Games platform and complements the Windows launcher without executing PC games on the phone.
 
-1. Abra a execução mais recente em [Actions](https://github.com/DeadsmileGames/mobile-app/actions/workflows/android-apk.yml).
-2. Selecione o artefato `Deadsmile-Mobile-debug-APK` para baixar o APK.
-3. Instale o APK no Android. Por ser um build debug, pode ser necessário permitir a instalação para o app usado para abrir o arquivo.
+- **Version:** 1.1.0
+- **Package ID:** `com.deadsmilegames.companion`
+- **Minimum Android version:** Android 8.0 (API 26)
+- **Target Android version:** Android 16 (API 36)
+- **UI:** Native Jetpack Compose
+- **Distribution:** Signed APK for direct installation; signed Android App Bundle (AAB) for Google Play
+- **Build validation:** GitHub Actions, UI contracts, and unit tests
 
-O APK de debug é assinado com a chave de depuração do Android e **não é uma build de release assinada para distribuição pública**.
+## Features
 
-## Requisitos de desenvolvimento
+- Global search across games, news, videos, and account-linked game lists.
+- Game catalog with portrait poster artwork and age-rating details.
+- News and video feeds with related game links when the platform provides them.
+- Account sign-in, profile settings, synchronized wishlist, and read-only PC library.
+- Portuguese (Brazilian), English, and Spanish app interfaces with explicit language selection.
+- Dynamic colors, light/dark/OLED themes, reduced motion, and notifications.
+- HTTPS-only API traffic and encrypted session-cookie storage.
+
+## Installation
+
+Open [GitHub Releases](https://github.com/DeadsmileGames/mobile-app/releases/latest) to get the latest signed direct-install APK. Android may ask you to allow installation for the app you use to open the APK.
+
+The APK is intended for direct distribution outside Google Play. The `.aab` asset is the publishing file for Play Console and cannot be installed directly on a phone. Installations from the direct APK and Google Play are separate distribution channels; switching channels may require uninstalling the previous version because Google Play signs delivered APKs with the Play app-signing key.
+
+## Google Play distribution
+
+New Android apps and app updates submitted to Google Play from **August 31, 2026** must target Android 16 (API 36) or higher. This project targets API 36; see the [official target API requirement](https://developer.android.com/google/play/requirements/target-sdk).
+
+The release workflow publishes both files to GitHub Releases:
+
+- `Deadsmile-Games-Android-v1.1.0.apk` — signed APK for direct installation.
+- `Deadsmile-Games-Play-Store-v1.1.0.aab` — signed Android App Bundle to upload in Google Play Console.
+- `SHA256SUMS.txt` — SHA-256 hashes for both files.
+
+The `direct` build retains user-confirmed APK updating for direct installations. The `play` build does not request `REQUEST_INSTALL_PACKAGES` and leaves app updates to Google Play. GitHub Actions does **not** submit an app to Play Console; upload the AAB and complete the Play listing, privacy policy, Data safety, content rating, app access/reviewer instructions, target-audience and ads declarations as applicable.
+
+## Development
+
+Requirements:
 
 - JDK 17
 - Gradle 8.13
-- Android SDK compatível com compileSdk 35
+- Android SDK Platform 36 and compatible Build Tools
 
-Com Gradle instalado, execute na raiz do repositório:
-
-```sh
-gradle --no-daemon testDebugUnitTest assembleDebug
-```
-
-## Distribuição assinada e atualizações
-
-O app verifica as releases públicas deste repositório ao abrir e inclui uma tela **Atualizações** com o histórico, as notas, a data e os APKs publicados. Uma atualização só é oferecida quando a versão da release é superior à instalada e o APK pertence ao pacote esperado e tem a mesma assinatura da instalação atual. O Android sempre apresenta a confirmação de instalação ao usuário; o Companion não instala pacotes silenciosamente.
-
-O workflow [Release Android](https://github.com/DeadsmileGames/mobile-app/actions/workflows/release-android.yml) publica builds de produção ao receber uma tag semântica, por exemplo `v1.1.1`. Antes da primeira release, configure estes GitHub Actions secrets em **Settings → Secrets and variables → Actions**:
-
-- `ANDROID_RELEASE_KEYSTORE_BASE64`: keystore de release codificado em Base64.
-- `ANDROID_RELEASE_STORE_PASSWORD`: senha do keystore.
-- `ANDROID_RELEASE_KEY_ALIAS`: alias da chave.
-- `ANDROID_RELEASE_KEY_PASSWORD`: senha da chave.
-
-Crie a chave em um ambiente seguro e guarde uma cópia de backup fora do repositório. Por exemplo, com JDK instalado:
+Run from the repository root:
 
 ```sh
-keytool -genkeypair -v -keystore deadsmile-companion-release.jks -alias deadsmile-companion -keyalg RSA -keysize 4096 -validity 10000
-base64 -w 0 deadsmile-companion-release.jks
+gradle --no-daemon testDirectDebugUnitTest testPlayDebugUnitTest assembleDirectDebug
 ```
 
-Copie a saída Base64 para o secret correspondente; **nunca** faça commit do keystore, senhas ou do conteúdo Base64. Use exatamente a mesma chave para todas as versões futuras. O workflow falha intencionalmente se os secrets não estiverem configurados, e o APK debug de Actions não pode atualizar a build assinada de produção. As releases disponíveis serão exibidas no Companion assim que forem publicadas.
+The Android APK workflow verifies the shared UI/localization contracts, runs unit tests for both distribution variants, builds a direct-debug APK, and publishes it as a GitHub Actions artifact.
 
+## Signed release process
+
+A semantic version tag such as `v1.1.0` triggers [Release Android](https://github.com/DeadsmileGames/mobile-app/actions/workflows/release-android.yml). The workflow runs the static audit and unit tests, builds both distribution variants, checks the package ID and target API, verifies the signatures, confirms that only the direct APK contains the package-install permission, then uploads the APK, AAB, and checksum file to a GitHub Release.
+
+Configure these GitHub Actions secrets before creating the release tag:
+
+- `ANDROID_RELEASE_KEYSTORE_BASE64` — release/upload keystore encoded as Base64.
+- `ANDROID_RELEASE_STORE_PASSWORD` — keystore password.
+- `ANDROID_RELEASE_KEY_ALIAS` — key alias.
+- `ANDROID_RELEASE_KEY_PASSWORD` — key password.
+
+Generate the upload key in a secure environment, store a backup outside the repository, and use the same key for future release assets:
+
+```sh
+keytool -genkeypair -v -keystore deadsmile-games-upload.jks -alias deadsmile-games-upload -keyalg RSA -keysize 4096 -validity 10000
+base64 -w 0 deadsmile-games-upload.jks
+```
+
+Never commit the keystore, passwords, or Base64 contents. Google Play App Signing should be enabled when setting up the Play Console app; the upload key is used to submit the AAB, and Google Play manages the signing key for delivered installs.
