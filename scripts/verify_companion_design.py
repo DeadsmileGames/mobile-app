@@ -126,6 +126,7 @@ RELEASE_CHECKS = [
     ("approved application ID is configured", 'applicationId = "com.deadsmilegames.companion"' in GRADLE),
     ("compile SDK targets API 36", "compileSdk = 36" in GRADLE),
     ("target SDK is API 36", "targetSdk = 36" in GRADLE),
+    ("release shrink has Tink Error Prone annotations available", 'implementation("com.google.errorprone:error_prone_annotations:2.50.0")' in GRADLE),
     ("direct flavor is configured", 'create("direct")' in GRADLE and 'buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "true")' in GRADLE),
     ("Play flavor is configured", 'create("play")' in GRADLE and 'buildConfigField("boolean", "IS_DIRECT_DISTRIBUTION", "false")' in GRADLE),
     ("base manifest has no package installation permission", "REQUEST_INSTALL_PACKAGES" not in MANIFEST),
