@@ -210,7 +210,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(busy = true, error = null)
         try {
             val result = withContext(Dispatchers.IO) {
-                api.request("PUT", "/account/privacy", JSONObject()
+                api.put("/account/privacy", JSONObject()
                     .put("shareGameActivity", options.shareGameActivity)
                     .put("sharePlaytime", options.shareGameActivity && options.sharePlaytime)
                     .put("shareAchievements", options.shareAchievements))
