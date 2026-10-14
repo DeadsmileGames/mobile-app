@@ -262,14 +262,14 @@ private fun DeadsmileRoot(
                 navigationIcon = {
                     if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES) {
                         IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
                     if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Configurações")
+                            Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
                     IconButton(onClick = {
@@ -278,7 +278,7 @@ private fun DeadsmileRoot(
                             Page.LIBRARY -> vm.library()
                             else -> vm.reload()
                         }
-                    }) { Icon(Icons.Default.Refresh, contentDescription = "Atualizar conteúdo") }
+                    }) { Icon(Icons.Default.Refresh, contentDescription = AppI18n.translate(LocalContext.current, "Atualizar conteúdo")) }
                 }
             )
         },
@@ -393,7 +393,7 @@ private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boo
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
+                            Icon(icon, contentDescription = AppI18n.translate(LocalContext.current, label), modifier = Modifier.size(22.dp))
                             if (active) {
                                 Spacer(Modifier.width(7.dp))
                                 Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -532,7 +532,7 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
+                        Icon(Icons.Default.Close, contentDescription = AppI18n.translate(LocalContext.current, "Limpar busca"))
                     }
                 }
             )
@@ -680,7 +680,7 @@ private fun GameDetailsScreen(
                         items(item.screenshots, key = { it }) { screenshot ->
                             SubcomposeAsyncImage(
                                 model = screenshot,
-                                contentDescription = "Captura de tela de ${item.title}",
+                                contentDescription = AppI18n.translate(LocalContext.current, "Captura de tela de ${item.title}"),
                                 modifier = Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                                 contentScale = ContentScale.Crop
                             ) {
@@ -715,8 +715,14 @@ private fun GameDetailsScreen(
 @Composable
 private fun GameAvailabilityCard(item: FeedItem) {
     var now by remember(item.releaseDate, item.status) { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(item.releaseDate, item.status) { while (true) { delay(1000); now = System.currentTimeMillis() } }
     val target = remember(item.releaseDate) { releaseTargetMillis(item.releaseDate) }
+    LaunchedEffect(target, item.status) {
+        val needsCountdown = item.status.equals("in_development", true) || item.status.equals("announced", true)
+        while (needsCountdown && target != null && System.currentTimeMillis() < target) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
     val remaining = target?.minus(now)
     val countdown = if (remaining != null && remaining > 0L) {
         val total = remaining / 1000L
@@ -1273,7 +1279,7 @@ private fun AccountAvatar(url: String?, modifier: Modifier = Modifier) {
     when {
         bitmap != null -> Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "Foto do perfil",
+            contentDescription = AppI18n.translate(LocalContext.current, "Foto do perfil"),
             modifier = modifier.clip(CircleShape),
             contentScale = ContentScale.Crop
         )
