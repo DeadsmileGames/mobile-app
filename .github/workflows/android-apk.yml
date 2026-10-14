@@ -38,8 +38,8 @@ jobs:
       - name: Verify production variant manifests and artifacts
         run: |
           set -euo pipefail
-          DIRECT_APK=app/build/outputs/apk/direct/release/app-direct-release.apk
-          PLAY_APK=app/build/outputs/apk/play/release/app-play-release.apk
+          DIRECT_APK=app/build/outputs/apk/direct/release/app-direct-release-unsigned.apk
+          PLAY_APK=app/build/outputs/apk/play/release/app-play-release-unsigned.apk
           PLAY_AAB=app/build/outputs/bundle/playRelease/app-play-release.aab
           test -s "$DIRECT_APK"
           test -s "$PLAY_APK"
