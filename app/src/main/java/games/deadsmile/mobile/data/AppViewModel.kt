@@ -14,7 +14,8 @@ data class UiState(
     val news: List<FeedItem> = emptyList(), val videos: List<FeedItem> = emptyList(),
     val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(),
     val user: UserAccount? = null, val loading: Boolean = true, val busy: Boolean = false,
-    val twoFactor: Boolean = false, val message: String? = null, val error: String? = null
+    val twoFactor: Boolean = false, val message: String? = null, val error: String? = null,
+    val detail: FeedItem? = null, val detailLoading: Boolean = false
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -34,6 +35,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         mutable.value = mutable.value.copy(news = content.first, videos = content.second, games = content.third, loading = false)
     }
+    fun loadDetails(item: FeedItem, isGame: Boolean) = viewModelScope.launch {
+        mutable.value = mutable.value.copy(detail = item, detailLoading = true)
+        val slug = item.slug.trim()
+        if (!slug.matches(Regex("[A-Za-z0-9-]{1,160}"))) {
+            mutable.value = mutable.value.copy(detailLoading = false)
+            return@launch
+        }
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching {
+                val route = if (isGame) "/games/" + slug else "/newswire/" + slug
+                api.get(route).detailItem(item)
+            }.getOrNull()
+        }
+        mutable.value = mutable.value.copy(
+            detail = loaded ?: item,
+            detailLoading = false,
+            message = if (loaded == null && item.body.isBlank()) "Não foi possível carregar o conteúdo completo agora. Tente novamente." else null
+        )
+    }
+
     fun account() = viewModelScope.launch {
         val user = withContext(Dispatchers.IO) { runCatching { api.get("/auth/me").userAccount() }.getOrNull() }
         mutable.value = mutable.value.copy(user = user)
