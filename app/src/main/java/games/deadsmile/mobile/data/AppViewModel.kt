@@ -90,7 +90,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun openRealtimeSocket() {
         if (!realtimeActive || realtimeSocket != null || realtimeConnectionJob?.isActive == true) return
         realtimeConnectionJob = viewModelScope.launch {
-            // Authenticated sessions need a live-ticket minted from ApiClient's encrypted session cookies.
             val ticket = withContext(Dispatchers.IO) {
                 runCatching {
                     api.get("/platform/live-ticket").optString("ticket").takeIf { it.isNotBlank() }
@@ -211,8 +210,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val initialGames = initial.third?.feed("items", "games") ?: emptyList()
         mutable.value = mutable.value.copy(news = initialNews, videos = initialVideos, games = initialGames, loading = false)
 
-        // First-page content is visible immediately; the rest of the catalog fills in
-        // quietly in the background so the mobile UI is never held behind pagination.
         val all = withContext(Dispatchers.IO) {
             coroutineScope {
                 val newsPages = initial.first?.optJSONObject("pagination")
@@ -562,7 +559,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
-
 
 internal enum class RealtimeEventTarget { Ignore, Wishlist, Account, PublicContent }
 
