@@ -461,12 +461,12 @@ private fun DeadsmileRoot(
                     }
                 },
                 actions = {
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
                         IconButton(onClick = { returnPage = page; page = Page.SEARCH }) {
                             Icon(Icons.Outlined.Search, contentDescription = AppI18n.translate(LocalContext.current, "Buscar em todo o app"))
                         }
                     }
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Outlined.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
@@ -2050,8 +2050,8 @@ private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.76f)).padding(20.dp), contentAlignment = Alignment.Center) {
         Card(Modifier.fillMaxWidth().widthIn(max = 420.dp), shape = RoundedCornerShape(28.dp)) {
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Escolha seu idioma", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Você pode mudar isso depois nas configurações.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Escolha seu idioma · Choose your language · Elige tu idioma", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("A escolha será aplicada ao app todo e poderá ser alterada nas configurações. / Your choice applies across the app and can be changed in Settings. / La elección se aplicará a toda la aplicación y podrás cambiarla en Ajustes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = { onSelect("pt-BR") }, modifier = Modifier.fillMaxWidth()) { Text("Português (Brasil)") }
                 OutlinedButton(onClick = { onSelect("en") }, modifier = Modifier.fillMaxWidth()) { Text("English") }
                 OutlinedButton(onClick = { onSelect("es") }, modifier = Modifier.fillMaxWidth()) { Text("Español") }
