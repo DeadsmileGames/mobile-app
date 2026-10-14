@@ -23,6 +23,7 @@ class ApiClient(context: Context) {
         private const val HOST = "api-ust8.onrender.com"
         private val JSON = "application/json; charset=utf-8".toMediaType()
     }
+    private val languageTag = context.resources.configuration.locales.get(0)?.toLanguageTag()?.take(35)?.ifBlank { "pt-BR" } ?: "pt-BR"
     private val prefs = EncryptedSharedPreferences.create(
         context, "deadsmile-session",
         MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
@@ -96,7 +97,7 @@ class ApiClient(context: Context) {
     }
     private fun execute(method: String, path: String, body: JSONObject?, token: String?): JSONObject {
         val builder = Request.Builder().url(BASE + path).header("Accept", "application/json")
-            .header("Accept-Language", "pt-BR").header("User-Agent", "DeadsmileAndroid/1.0.0")
+            .header("Accept-Language", languageTag).header("User-Agent", "DeadsmileGamesCompanion/1.1.0")
         if (token != null) builder.header("X-CSRF-Token", token)
         builder.method(method, if (body != null) body.toString().toRequestBody(JSON) else null)
         client.newCall(builder.build()).execute().use { response ->

@@ -8,7 +8,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -16,8 +15,10 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import games.deadsmile.mobile.MainActivity
+import games.deadsmile.mobile.AppI18n
 import games.deadsmile.mobile.R
 import org.json.JSONObject
+import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -51,19 +52,29 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         var failures = 0
         for (stream in streams) {
             val items = runCatching { stream.load().distinctBy { it.id } }
-                .onFailure { failures++ }.getOrNull().orEmpty()
-            if (items.isEmpty()) continue
+                .onFailure { failures++ }.getOrNull() ?: continue
+            // A successful empty response is still a valid baseline. This lets the first future item notify.
             succeeded++
-            val key = "notification_last_" + stream.key
-            val latestId = items.first().id
+            val key = "notification_seen_ids_" + stream.key
             val previous = preferences.getString(key, null)
-            // Save a baseline the first time, instead of notifying about old content.
-            preferences.edit().putString(key, latestId).apply()
-            if (previous == null || previous == latestId) continue
+            val seenIds = previous?.let { raw ->
+                runCatching {
+                    val saved = JSONArray(raw)
+                    buildSet {
+                        for (index in 0 until saved.length()) saved.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                    }
+                }.getOrDefault(emptySet())
+            }
+            if (seenIds == null) {
+                // The first successful poll establishes a baseline and never emits historical alerts.
+                preferences.edit().putString(key, JSONArray(items.map { it.id }).toString()).apply()
+                continue
+            }
 
-            // Notify about several new entries when the app has been asleep for a while.
-            val newer = items.takeWhile { it.id != previous }.take(3)
-                .ifEmpty { listOf(items.first()) }
+            // Compare every identifier in the current page, not only its first row.
+            val newer = items.filterNot { it.id in seenIds }.take(3)
+            val refreshedIds = (items.map { it.id } + seenIds).distinct().take(144)
+            preferences.edit().putString(key, JSONArray(refreshedIds).toString()).apply()
             newer.forEach { entry ->
                 val summary = entry.summary.takeIf { it.isNotBlank() } ?: entry.title
                 sendNotification(context, (stream.key + entry.id).hashCode(), stream.title, summary)
@@ -155,10 +166,8 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
 
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Novidades Deadsmile", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Novos jogos, notícias e vídeos."
-                enableLights(true)
-                lightColor = Color.rgb(129, 115, 255)
+            val channel = NotificationChannel(CHANNEL_ID, AppI18n.translate(context, "Novidades do catálogo"), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = AppI18n.translate(context, "Novos jogos, notícias e vídeos.")
             }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
@@ -171,14 +180,15 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         val pendingIntent = PendingIntent.getActivity(
             context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val localizedTitle = AppI18n.translate(context, title)
+        val localizedMessage = AppI18n.translate(context, message)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_deadsmile)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setContentTitle(localizedTitle)
+            .setContentText(localizedMessage)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(localizedMessage))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setColor(Color.rgb(129, 115, 255))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }

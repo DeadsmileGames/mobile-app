@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -57,6 +60,15 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material3.*
+import androidx.compose.material3.Text as MaterialText
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -77,25 +89,73 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import games.deadsmile.mobile.data.AppViewModel
 import games.deadsmile.mobile.data.FeedItem
 import games.deadsmile.mobile.data.UiState
 import games.deadsmile.mobile.data.PrivacyOptions
+import games.deadsmile.mobile.data.GitHubRelease
+import games.deadsmile.mobile.data.GitHubReleaseRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
-    HOME("Início"), GAMES("Jogos"), NEWS("Notícias"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
-    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes")
+    HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
+    ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações")
 }
 
-private val BrandInk = Color(0xFF111019)
-private val BrandViolet = Color(0xFF8173FF)
-private val BrandRose = Color(0xFFFF647C)
+private val BrandInk = Color(0xFF101010)
+
+@Composable
+private fun Text(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontStyle: FontStyle? = null,
+    fontWeight: FontWeight? = null,
+    fontFamily: FontFamily? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    textDecoration: TextDecoration? = null,
+    textAlign: TextAlign? = null,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    overflow: TextOverflow = TextOverflow.Clip,
+    softWrap: Boolean = true,
+    maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
+    style: TextStyle = LocalTextStyle.current
+) {
+    MaterialText(
+        text = AppI18n.translate(LocalContext.current, text),
+        modifier = modifier,
+        color = color,
+        fontSize = fontSize,
+        fontStyle = fontStyle,
+        fontWeight = fontWeight,
+        fontFamily = fontFamily,
+        letterSpacing = letterSpacing,
+        textDecoration = textDecoration,
+        textAlign = textAlign,
+        lineHeight = lineHeight,
+        overflow = overflow,
+        softWrap = softWrap,
+        maxLines = maxLines,
+        minLines = minLines,
+        onTextLayout = onTextLayout,
+        style = style
+    )
+}
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { DeadsmileApp() }
@@ -107,24 +167,40 @@ class MainActivity : ComponentActivity() {
 private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    LaunchedEffect(Unit) {
+        val permissionGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (prefs.getBoolean("notifications_enabled", false) && permissionGranted) scheduleContentNotifications(context)
+    }
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
-    var accentPalette by rememberSaveable { mutableIntStateOf(prefs.getInt("accent_palette", 0).coerceIn(0, 3)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
     val systemDark = isSystemInDarkTheme()
-    val dark = when (themeMode) { 1 -> false; 2 -> true; else -> systemDark }
+    val dark = when (themeMode) { 1 -> false; 2, 3 -> true; else -> systemDark }
     val scheme = when {
+        themeMode == 3 && Build.VERSION.SDK_INT >= 31 -> dynamicDarkColorScheme(context).copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceVariant = Color(0xFF080808),
+            surfaceContainerLowest = Color.Black,
+            surfaceContainerLow = Color.Black,
+            surfaceContainer = Color(0xFF050505),
+            surfaceContainerHigh = Color(0xFF0B0B0B),
+            surfaceContainerHighest = Color(0xFF141414)
+        )
+        themeMode == 3 -> darkColorScheme(
+            primary = Color(0xFFE2E2E2), secondary = Color(0xFFC8C8C8), tertiary = Color(0xFFAAAAAA),
+            background = Color.Black, surface = Color.Black, surfaceVariant = Color(0xFF080808),
+            surfaceContainerLowest = Color.Black, surfaceContainerLow = Color.Black,
+            surfaceContainer = Color(0xFF050505), surfaceContainerHigh = Color(0xFF0B0B0B),
+            surfaceContainerHighest = Color(0xFF141414)
+        )
         Build.VERSION.SDK_INT >= 31 && dynamicColors && dark -> dynamicDarkColorScheme(context)
         Build.VERSION.SDK_INT >= 31 && dynamicColors -> dynamicLightColorScheme(context)
         dark -> darkColorScheme(
-            primary = listOf(Color(0xFFB8AEFF), Color(0xFFFF9DB0), Color(0xFF8AD8CF), Color(0xFF9CBFFF))[accentPalette],
-            secondary = listOf(Color(0xFFFF91A2), Color(0xFFB8AEFF), Color(0xFFFFB3C0), Color(0xFF91D9D0))[accentPalette],
-            tertiary = Color(0xFF91D9D0)
+            primary = Color(0xFFD8D8D8), secondary = Color(0xFFBFBFBF), tertiary = Color(0xFFA5A5A5)
         )
         else -> lightColorScheme(
-            primary = listOf(Color(0xFF5B4BCC), Color(0xFFB4234F), Color(0xFF176B65), Color(0xFF2458B8))[accentPalette],
-            secondary = listOf(Color(0xFFB4234F), Color(0xFF5B4BCC), Color(0xFF8C3655), Color(0xFF176B65))[accentPalette],
-            tertiary = Color(0xFF176B65)
+            primary = Color(0xFF454545), secondary = Color(0xFF626262), tertiary = Color(0xFF777777)
         )
     }
     MaterialTheme(colorScheme = scheme) {
@@ -135,12 +211,6 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 onThemeMode = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
-                accentPalette = accentPalette,
-                onAccentPalette = {
-                    accentPalette = it.coerceIn(0, 3)
-                    dynamicColors = false
-                    prefs.edit().putInt("accent_palette", accentPalette).putBoolean("dynamic_colors", false).apply()
-                },
                 reduceMotion = reduceMotion,
                 onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() }
             )
@@ -156,8 +226,6 @@ private fun DeadsmileRoot(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
-    accentPalette: Int,
-    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit
 ) {
@@ -168,6 +236,21 @@ private fun DeadsmileRoot(
     var detailIsGame by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
+    val preferences = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    var tourComplete by rememberSaveable { mutableStateOf(preferences.getBoolean("tour_completed", false)) }
+    var tourStage by rememberSaveable { mutableIntStateOf(if (tourComplete) -1 else 0) }
+    var tourFeedback by remember { mutableStateOf<String?>(null) }
+    val tourTargets = listOf(Page.HOME, Page.NEWS, Page.VIDEOS, Page.LIBRARY, Page.ACCOUNT)
+
+    var releases by remember { mutableStateOf<List<GitHubRelease>>(emptyList()) }
+    var releasesLoading by remember { mutableStateOf(true) }
+    var releaseError by remember { mutableStateOf<String?>(null) }
+    var updateBusyVersion by remember { mutableStateOf<String?>(null) }
+    var updateProgress by remember { mutableIntStateOf(0) }
+    var pendingUpdateFile by remember { mutableStateOf<File?>(null) }
+    var showInstallPermissionDialog by remember { mutableStateOf(false) }
+    var autoUpdateError by remember { mutableStateOf<String?>(null) }
+    val updateScope = rememberCoroutineScope()
 
     LaunchedEffect(state.message, state.error) {
         (state.error ?: state.message)?.let {
@@ -178,7 +261,88 @@ private fun DeadsmileRoot(
     LaunchedEffect(page, detailItem?.id, detailItem?.slug, detailIsGame) {
         if (page == Page.DETAILS) detailItem?.let { vm.loadDetails(it, detailIsGame) }
     }
-    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES) {
+    LaunchedEffect(tourFeedback) {
+        val message = tourFeedback ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        tourFeedback = null
+    }
+    LaunchedEffect(autoUpdateError) {
+        val message = autoUpdateError ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        autoUpdateError = null
+    }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val file = pendingUpdateFile
+        if (file != null && file.exists() && GitHubReleaseRepository.canInstall(context)) {
+            runCatching { GitHubReleaseRepository.install(context, file) }
+                .onFailure { autoUpdateError = it.message ?: "Não foi possível abrir o instalador." }
+            showInstallPermissionDialog = false
+        }
+    }
+
+    val beginUpdateDownload: (GitHubRelease) -> Unit = { release ->
+        updateScope.launch {
+            if (BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") {
+                autoUpdateError = "A instalação automática exige a versão de distribuição assinada."
+            } else {
+                updateBusyVersion = release.version
+                updateProgress = 0
+                releaseError = null
+                try {
+                    val cached = GitHubReleaseRepository.cachedFile(context, release)
+                    val file = if (cached != null && cached.isFile && cached.length() > 0L) cached
+                    else GitHubReleaseRepository.download(context, release) { percent -> updateProgress = percent }
+                    pendingUpdateFile = file
+                    if (GitHubReleaseRepository.canInstall(context)) {
+                        GitHubReleaseRepository.install(context, file)
+                    } else {
+                        showInstallPermissionDialog = true
+                    }
+                } catch (error: Exception) {
+                    autoUpdateError = error.message ?: "Não foi possível baixar ou preparar a atualização."
+                } finally {
+                    updateBusyVersion = null
+                }
+            }
+        }
+    }
+
+    fun refreshReleases() {
+        updateScope.launch {
+            releasesLoading = true
+            releaseError = null
+            try {
+                releases = GitHubReleaseRepository.fetchReleases()
+            } catch (error: Exception) {
+                releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
+            } finally {
+                releasesLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        releasesLoading = true
+        releaseError = null
+        try {
+            releases = GitHubReleaseRepository.fetchReleases()
+            val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME)
+            // Update download is deferred until the one-time tour ends.
+        } catch (error: Exception) {
+            releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
+        } finally {
+            releasesLoading = false
+        }
+    }
+
+    LaunchedEffect(tourStage, releasesLoading, releases) {
+        if (tourStage >= 0 || releasesLoading || BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") return@LaunchedEffect
+        val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME) ?: return@LaunchedEffect
+        if (updateBusyVersion == null) beginUpdateDownload(newest)
+    }
+
+    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
         page = if (page == Page.GAMES) Page.HOME else returnPage
     }
 
@@ -186,45 +350,86 @@ private fun DeadsmileRoot(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("Deadsmile", fontWeight = FontWeight.Bold)
-                        Text(
-                            when (page) {
-                                Page.HOME -> "Jogos, notícias e novidades"
-                                Page.DETAILS -> "Detalhes do jogo"
-                                else -> page.label
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    if (page == Page.DETAILS) {
+                        MaterialText(
+                            text = detailItem?.title.orEmpty(),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    } else {
+                        val title = when (page) {
+                            Page.HOME -> "Início"
+                            Page.GAMES -> "Catálogo de jogos"
+                            Page.NEWS -> "Newswire"
+                            Page.VIDEOS -> "Vídeos"
+                            Page.LIBRARY -> "Biblioteca"
+                            Page.ACCOUNT -> "Conta"
+                            Page.WISHLIST -> "Lista de desejos"
+                            Page.SETTINGS -> "Configurações"
+                            Page.DETAILS -> "Detalhes"
+                            Page.UPDATES -> "Atualizações"
+                        }
+                        Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
                         IconButton(onClick = { page = if (page == Page.GAMES) Page.HOME else returnPage }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
-                    if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Configurações")
+                            Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
-                    IconButton(onClick = {
-                        when (page) {
-                            Page.ACCOUNT -> vm.account()
-                            Page.LIBRARY -> vm.library()
-                            else -> vm.reload()
-                        }
-                    }) { Icon(Icons.Default.Refresh, contentDescription = "Atualizar conteúdo") }
+                    if (tourStage < 0) {
+                        IconButton(onClick = {
+                            when (page) {
+                                Page.ACCOUNT -> vm.account()
+                                Page.LIBRARY -> vm.library()
+                                Page.UPDATES -> refreshReleases()
+                                else -> vm.reload()
+                            }
+                        }) { Icon(Icons.Default.Refresh, contentDescription = AppI18n.translate(LocalContext.current, "Atualizar conteúdo")) }
+                    }
                 }
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
-                FloatingDock(page = page, onSelect = { page = it }, reduceMotion = reduceMotion)
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && tourStage != 6) {
+                val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
+                FloatingDock(
+                    page = page,
+                    tourTarget = tourTarget,
+                    onSelect = { selected ->
+                        when {
+                            tourStage == 0 || tourStage == 6 -> Unit
+                            tourStage in 1..5 -> {
+                                val expected = tourTargets[tourStage - 1]
+                                if (selected == expected) {
+                                    page = selected
+                                    tourStage += 1
+                                    tourFeedback = when (selected) {
+                                        Page.HOME -> "Parabéns! Você conheceu a página inicial."
+                                        Page.NEWS -> "Parabéns! Você encontrou a área de newswire."
+                                        Page.VIDEOS -> "Parabéns! Você encontrou os vídeos."
+                                        Page.LIBRARY -> "Parabéns! Você encontrou sua biblioteca."
+                                        Page.ACCOUNT -> "Parabéns! Você chegou à conta e ao login."
+                                        else -> ""
+                                    }
+                                } else {
+                                    tourFeedback = "Toque na aba destacada para continuar o tour."
+                                }
+                            }
+                            else -> page = selected
+                        }
+                    },
+                    reduceMotion = reduceMotion
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -267,8 +472,21 @@ private fun DeadsmileRoot(
                 Page.SETTINGS -> SettingsScreen(
                     themeMode = themeMode, onThemeMode = onThemeMode,
                     dynamicColors = dynamicColors, onDynamicColors = onDynamicColors,
-                    accentPalette = accentPalette, onAccentPalette = onAccentPalette,
-                    reduceMotion = reduceMotion, onReduceMotion = onReduceMotion
+                    reduceMotion = reduceMotion, onReduceMotion = onReduceMotion,
+                    onOpenUpdates = { returnPage = Page.SETTINGS; page = Page.UPDATES }
+                )
+                Page.UPDATES -> UpdatesScreen(
+                    releases = releases,
+                    loading = releasesLoading,
+                    error = releaseError,
+                    installedVersion = BuildConfig.VERSION_NAME,
+                    updateBusyVersion = updateBusyVersion,
+                    updateProgress = updateProgress,
+                    autoUpdateError = autoUpdateError,
+                    allowInstall = BuildConfig.APPLICATION_ID == "games.deadsmile.mobile",
+                    onRefresh = ::refreshReleases,
+                    onInstall = beginUpdateDownload,
+                    onOpenRelease = { url -> openExternal(context, url) }
                 )
                 Page.DETAILS -> detailItem?.let { item ->
                     val displayItem = state.detail?.takeIf {
@@ -284,16 +502,109 @@ private fun DeadsmileRoot(
                         },
                         onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
+                        onOpenExternal = { url -> openExternal(context, url) },
                         onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
+            }
+        }
+        if (tourStage == 0) {
+            TourWelcomeOverlay(
+                onStart = { tourStage = 1 },
+                onSkip = { tourStage = -1; tourComplete = true; preferences.edit().putBoolean("tour_completed", true).apply() }
+            )
+        } else if (tourStage in 1..5) {
+            val target = tourTargets[tourStage - 1]
+            TourStepOverlay(
+                title = when (target) {
+                    Page.HOME -> "Página inicial"
+                    Page.NEWS -> "Newswire"
+                    Page.VIDEOS -> "Vídeos"
+                    Page.LIBRARY -> "Biblioteca"
+                    Page.ACCOUNT -> "Conta"
+                    else -> "Navegação"
+                },
+                description = when (target) {
+                    Page.HOME -> "Aqui você encontra o resumo do Companion e o carrossel de jogos."
+                    Page.NEWS -> "Esta aba mostra as publicações e notícias carregadas da plataforma."
+                    Page.VIDEOS -> "Aqui ficam os vídeos publicados e seus links oficiais."
+                    Page.LIBRARY -> "A biblioteca exibe os jogos da sua conta para PC, sem instalar jogos no Android."
+                    Page.ACCOUNT -> "Nesta área você entra na conta, gerencia o perfil e acessa a lista de desejos."
+                    else -> ""
+                },
+                onSkip = { tourStage = -1; tourComplete = true; preferences.edit().putBoolean("tour_completed", true).apply() }
+            )
+        } else if (tourStage == 6) {
+            TourThanksOverlay(
+                onFinish = {
+                    tourStage = -1
+                    tourComplete = true
+                    preferences.edit().putBoolean("tour_completed", true).apply()
+                }
+            )
+        }
+    }
+    if (showInstallPermissionDialog && pendingUpdateFile != null) {
+        AlertDialog(
+            onDismissRequest = { showInstallPermissionDialog = false },
+            title = { Text("Atualização pronta") },
+            text = { Text("O APK foi baixado. Para continuar, permita que o Companion solicite a instalação desta versão nas configurações do Android.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showInstallPermissionDialog = false
+                    installPermissionLauncher.launch(
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.packageName))
+                    )
+                }) { Text("Abrir configurações") }
+            },
+            dismissButton = { TextButton(onClick = { showInstallPermissionDialog = false }) { Text("Agora não") } }
+        )
+    }
+}
+
+@Composable
+private fun TourWelcomeOverlay(onStart: () -> Unit, onSkip: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Bem-vindo ao Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Começar tour") }
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Pular por enquanto") }
             }
         }
     }
 }
 
 @Composable
-private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boolean) {
+private fun TourStepOverlay(title: String, description: String, onSkip: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)).padding(16.dp), contentAlignment = Alignment.TopCenter) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp).padding(top = 12.dp), shape = RoundedCornerShape(24.dp)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Toque na aba destacada na barra inferior para continuar.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.End)) { Text("Pular tour") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TourThanksOverlay(onFinish: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Obrigado por conhecer o Companion!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Concluir e acessar a conta") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit, reduceMotion: Boolean) {
     val destinations = listOf(
         Triple(Page.HOME, Icons.Default.Home, "Início"),
         Triple(Page.NEWS, Icons.Default.Article, "Notícias"),
@@ -320,11 +631,14 @@ private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boo
             ) {
                 destinations.forEach { (target, icon, label) ->
                     val active = (if (page == Page.GAMES) Page.HOME else page) == target
+                    val isTourTarget = tourTarget == target
                     Surface(
                         onClick = { onSelect(target) },
                         shape = RoundedCornerShape(26.dp),
-                        color = if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isTourTarget) MaterialTheme.colorScheme.primaryContainer else if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                        contentColor = if (isTourTarget) MaterialTheme.colorScheme.onPrimaryContainer else if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        border = if (isTourTarget) androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
+                        shadowElevation = if (isTourTarget) 8.dp else 0.dp,
                         modifier = Modifier.animateContentSize(tween(if (reduceMotion) 0 else 180))
                     ) {
                         Row(
@@ -332,7 +646,7 @@ private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boo
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
+                            Icon(icon, contentDescription = AppI18n.translate(LocalContext.current, label), modifier = Modifier.size(22.dp))
                             if (active) {
                                 Spacer(Modifier.width(7.dp))
                                 Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -355,62 +669,35 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
-    LazyColumn(
-        Modifier.fillMaxSize().padding(pad),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp)
-    ) {
+    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
-            Card(
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f)),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                        Text("DEADSMILE GAMES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                    Text("Seu próximo jogo começa aqui.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Descubra lançamentos, acompanhe novidades e consulte sua biblioteca do PC.", color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        FilledTonalButton(onClick = news) { Icon(Icons.Default.Article, null); Spacer(Modifier.width(6.dp)); Text("Novidades") }
-                        OutlinedButton(onClick = videos) { Icon(Icons.Default.Videocam, null); Spacer(Modifier.width(6.dp)); Text("Vídeos") }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+                item(key = "companion-welcome") {
+                    Card(Modifier.width(320.dp).height(300.dp), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Catálogo de jogos, newswire, vídeos e biblioteca para PC.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.weight(1f))
+                            Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Explorar jogos") }
+                            OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Newswire") }
+                        }
                     }
                 }
+                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes", compact = true) { openGame(game) } }
             }
         }
-        item { Section("Jogos", if (state.games.isEmpty()) "" else "Ver catálogo", openCatalog) }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
         else if (state.games.isEmpty()) item { Empty("O catálogo não está disponível agora. Tente atualizar em alguns instantes.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.games, key = { it.id }) { game -> FeedCard(game, Modifier.width(230.dp), "Detalhes") { openGame(game) } }
-            }
-        }
         item { Section("Notícias", if (state.news.isEmpty()) "" else "Ver todas", news) }
         if (state.loading && state.news.isEmpty()) item { LoadingRow() }
         else if (state.news.isEmpty()) item { Empty("Nenhuma notícia nova por enquanto.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.news.take(8), key = { it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } }
-            }
-        }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.news.take(8), key = { "home-news-" + it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } } } }
         item { Section("Vídeos", if (state.videos.isEmpty()) "" else "Ver todos", videos) }
         if (state.loading && state.videos.isEmpty()) item { LoadingRow() }
         else if (state.videos.isEmpty()) item { Empty("Novos vídeos aparecerão aqui quando estiverem disponíveis.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.videos.take(8), key = { it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") {
-                    if (video.url != null) openStory(video) else openStory(video)
-                } }
-            }
-        }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.videos.take(8), key = { "home-video-" + it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") { openStory(video) } } } }
     }
 }
-
 @Composable
 private fun Section(title: String, action: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -458,7 +745,7 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
+                        Icon(Icons.Default.Close, contentDescription = AppI18n.translate(LocalContext.current, "Limpar busca"))
                     }
                 }
             )
@@ -472,23 +759,33 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
 }
 
 @Composable
-private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, open: () -> Unit) {
+private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
     Card(
         modifier = modifier.clickable(onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column {
             if (item.image != null) {
-                AsyncImage(item.image, item.title, Modifier.fillMaxWidth().height(155.dp), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                    SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                        if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else SubcomposeAsyncImageContent()
+                    }
+                }
             } else {
                 Box(
-                    Modifier.fillMaxWidth().height(112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    Modifier.fillMaxWidth().height(if (compact) 106.dp else 112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
+                if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3)
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -505,6 +802,7 @@ private fun GameDetailsScreen(
     onToggleWishlist: () -> Unit,
     onRelated: (FeedItem) -> Unit,
     onOpenSite: () -> Unit,
+    onOpenExternal: (String) -> Unit,
     onOpenVideo: () -> Unit
 ) {
     LazyColumn(
@@ -515,7 +813,15 @@ private fun GameDetailsScreen(
         item {
             Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 item.image?.let { image ->
-                    AsyncImage(image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    SubcomposeAsyncImage(model = image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                        if (painter.state is AsyncImagePainter.State.Success) {
+                            SubcomposeAsyncImageContent()
+                        } else {
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
@@ -523,15 +829,6 @@ private fun GameDetailsScreen(
                     ))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
-                        Text(
-                            if (isGame) "CATÁLOGO DEADSMILE" else "DEADSMILE · CONTEÚDO",
-                            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                     Text(item.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
@@ -558,23 +855,24 @@ private fun GameDetailsScreen(
                             }
                         }
                     }
-                    Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Disponível para PC", fontWeight = FontWeight.SemiBold)
-                                Text("A instalação pelo celular ainda não está disponível. Você pode consultar os detalhes no site ou usar o launcher para Windows.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+                    GameAvailabilityCard(item)
+                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Visitar site oficial") }
+                    item.microsoftStoreUrl?.let { storeUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(storeUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir Microsoft Store") }
                     }
-                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver no site Deadsmile") }
+                    item.itchUrl?.let { itchUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver página no itch.io") }
+                    } ?: item.purchaseUrl?.let { purchaseUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver opções de compra") }
+                    }
                     OutlinedButton(onClick = onToggleWishlist, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
                         Icon(if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null)
                         Spacer(Modifier.width(8.dp))
                         Text(if (isWishlisted) "Remover da lista de desejos" else "Adicionar à lista de desejos")
                     }
                 } else {
-                    val byline = listOf(item.author, item.publishedAt).filter { it.isNotBlank() }.joinToString(" · ")
+                    val dateLabel = item.publishedAt.takeIf { it.isNotBlank() }?.let { formatDisplayDate(it, LocalContext.current) }.orEmpty()
+                    val byline = listOf(item.author, dateLabel).filter { it.isNotBlank() }.joinToString(" · ")
                     if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(if (isGame) "Sobre o jogo" else "Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -584,11 +882,20 @@ private fun GameDetailsScreen(
                     Text(if (isGame) "Capturas de tela" else "Imagens do artigo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(item.screenshots, key = { it }) { screenshot ->
-                            AsyncImage(
-                                screenshot, "Captura de tela de ${item.title}",
-                                Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)),
+                            SubcomposeAsyncImage(
+                                model = screenshot,
+                                contentDescription = AppI18n.translate(LocalContext.current, "Captura de tela de ${item.title}"),
+                                modifier = Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                                 contentScale = ContentScale.Crop
-                            )
+                            ) {
+                                if (painter.state is AsyncImagePainter.State.Success) {
+                                    SubcomposeAsyncImageContent()
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -607,6 +914,97 @@ private fun GameDetailsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun GameAvailabilityCard(item: FeedItem) {
+    val context = LocalContext.current
+    var now by remember(item.releaseDate, item.status) { mutableLongStateOf(System.currentTimeMillis()) }
+    val target = remember(item.releaseDate) { releaseTargetMillis(item.releaseDate) }
+    LaunchedEffect(target, item.status) {
+        val needsCountdown = item.status.equals("in_development", true) || item.status.equals("announced", true)
+        while (needsCountdown && target != null && System.currentTimeMillis() < target) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val remaining = target?.minus(now)
+    val countdown = if (remaining != null && remaining > 0L) {
+        val total = remaining / 1000L
+        val days = total / 86_400L
+        val hours = (total % 86_400L) / 3_600L
+        val minutes = (total % 3_600L) / 60L
+        val seconds = total % 60L
+        listOfNotNull(
+            days.takeIf { it > 0 }?.let { "${it}d" },
+            hours.takeIf { days > 0 || it > 0 }?.let { "${it}h" },
+            minutes.takeIf { days > 0 || hours > 0 || it > 0 }?.let { "${it}m" },
+            seconds.takeIf { days == 0L && hours == 0L && minutes == 0L }?.let { "${it}s" }
+        ).joinToString(" ")
+    } else null
+    val released = item.status.equals("released", true)
+    val inDevelopment = item.status.equals("in_development", true)
+    val announced = item.status.equals("announced", true)
+    val availabilityMismatch = if (released) item.launcherAvailable != item.downloadAvailable else item.launcherAvailable || item.downloadAvailable
+    val availableInLauncher = released && item.launcherAvailable && item.downloadAvailable
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Icon(when {
+                released && item.launcherAvailable -> Icons.Default.VideogameAsset
+                inDevelopment || announced -> Icons.Default.Notifications
+                else -> Icons.Default.Article
+            }, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(when {
+                    released && availabilityMismatch -> "Publicado · disponibilidade divergente"
+                    availableInLauncher -> "Publicado · disponível no launcher para Windows"
+                    released -> "Publicado · download ainda não configurado"
+                    availabilityMismatch -> "Verificação de publicação necessária"
+                    inDevelopment -> "Em desenvolvimento"
+                    announced -> "Jogo anunciado"
+                    else -> "Estado do jogo"
+                }, fontWeight = FontWeight.SemiBold)
+                Text(when {
+                    released && availabilityMismatch -> "O status de publicação não confere com os indicadores do launcher. Consulte o catálogo oficial antes de considerar o jogo disponível."
+                    availableInLauncher -> "O catálogo confirma que o jogo está publicado. Para instalar ou jogar, use o launcher no PC."
+                    released -> "O jogo está marcado como publicado, mas a API não confirma um download configurado. Consulte os canais oficiais."
+                    availabilityMismatch -> "O catálogo indica disponibilidade no launcher, mas o status ainda não confirma lançamento. Confira a página oficial do jogo."
+                    inDevelopment && countdown != null -> "Lançamento previsto em $countdown."
+                    inDevelopment && item.releaseDate.isNotBlank() && target != null && target <= now -> "A data prevista passou, mas o catálogo ainda marca o jogo como em desenvolvimento."
+                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: ${formatDisplayDate(item.releaseDate, context)}."
+                    inDevelopment -> "Ainda não há uma data de lançamento publicada."
+                    announced && countdown != null -> "Anunciado. Lançamento previsto em $countdown."
+                    announced && target != null && target <= now -> "A data prevista passou, mas o catálogo continua marcando o jogo como anunciado."
+                    announced && item.releaseDate.isNotBlank() -> "Data prevista: ${formatDisplayDate(item.releaseDate, context)}."
+                    announced -> "O jogo foi anunciado, mas a data de lançamento ainda não foi divulgada."
+                    else -> "Não há dados suficientes para confirmar a disponibilidade deste jogo. Consulte o site oficial."
+                }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (item.accessType.equals("paid", true)) Text("Acesso pago", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                else if (item.accessType.equals("free", true)) Text("Gratuito", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                if (item.platforms.isNotEmpty()) Text("Plataformas: ${item.platforms.joinToString(" · ")}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private fun formatDisplayDate(value: String, context: Context): String {
+    val raw = value.trim()
+    if (raw.isBlank()) return ""
+    val locale = runCatching { context.resources.configuration.locales[0] }.getOrNull() ?: java.util.Locale.getDefault()
+    val date = runCatching { java.time.Instant.parse(raw).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }.getOrNull()
+        ?: runCatching { java.time.OffsetDateTime.parse(raw).toLocalDate() }.getOrNull()
+        ?: runCatching { java.time.LocalDate.parse(raw.take(10)) }.getOrNull()
+        ?: return raw
+    return date.format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM).withLocale(locale))
+}
+
+private fun releaseTargetMillis(value: String): Long? {
+    val raw = value.trim()
+    if (raw.isBlank()) return null
+    runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()?.let { return it }
+    runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }.getOrNull()?.let { return it }
+    val date = runCatching { java.time.LocalDate.parse(raw.take(10)) }.getOrNull() ?: return null
+    return date.atTime(23, 59, 59).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 @Composable
@@ -649,9 +1047,13 @@ private fun WishlistScreen(
             items(state.wishlist, key = { it.id }) { game ->
                 Card(shape = RoundedCornerShape(20.dp)) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (game.image != null) AsyncImage(game.image, game.title, Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
-                        else Box(Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp))
+                        Box(Modifier.size(86.dp, 112.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                            if (game.image != null) {
+                                SubcomposeAsyncImage(model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                    else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else Icon(Icons.Default.VideogameAsset, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Text(game.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
@@ -705,8 +1107,14 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (game.image != null) AsyncImage(game.image, game.title, Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
-                        else Box(Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) { Icon(Icons.Default.CollectionsBookmark, null) }
+                        Box(Modifier.size(82.dp, 96.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                            if (game.image != null) {
+                                SubcomposeAsyncImage(model = game.image, contentDescription = game.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                    else Icon(Icons.Default.CollectionsBookmark, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else Icon(Icons.Default.CollectionsBookmark, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(game.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             if (game.summary.isNotBlank()) Text(game.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
@@ -728,7 +1136,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var code by rememberSaveable { mutableStateOf("") }
     var registerMode by rememberSaveable { mutableStateOf(false) }
 
-    var fullName by rememberSaveable { mutableStateOf("") }
     var profileBio by rememberSaveable { mutableStateOf("") }
     var websiteUrl by rememberSaveable { mutableStateOf("") }
     var location by rememberSaveable { mutableStateOf("") }
@@ -758,7 +1165,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 
     LaunchedEffect(state.accountProfile) {
         state.accountProfile?.let { profile ->
-            fullName = profile.fullName
             username = profile.username
             profileBio = profile.bio
             websiteUrl = profile.websiteUrl
@@ -792,7 +1198,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     if (state.accountLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (editingProfile) {
                         HorizontalDivider()
-                        OutlinedTextField(fullName, { fullName = it.take(80) }, label = { Text("Nome de exibição") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(username, { username = it.take(24) }, label = { Text("Nome de usuário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
@@ -817,13 +1222,12 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
-                            onClick = { vm.saveProfile(fullName, username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
+                            onClick = { vm.saveProfile(username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
                         TextButton(onClick = { editingProfile = false; profile?.let {
                             username = it.username
-                            fullName = it.fullName
                             profileBio = it.bio
                             websiteUrl = it.websiteUrl
                             location = it.location
@@ -967,46 +1371,41 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                 state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
                 state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
             ).distinct().take(18)
-            .ifEmpty { listOf("https://raw.githubusercontent.com/deadsmilegames/launcher/main/winui/src/Deadsmile.Launcher/Assets/LargeTile.png") }
+            
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
-        while (true) {
+        while (images.isNotEmpty()) {
             delay(3000)
-            imageIndex = if (images.isEmpty()) 0 else (imageIndex + 1) % images.size
+            imageIndex = (imageIndex + 1) % images.size
         }
     }
 
-    Box(Modifier.fillMaxSize().padding(pad)) {
-        AnimatedContent(
-            targetState = imageIndex,
-            transitionSpec = { fadeIn(tween(650)) togetherWith fadeOut(tween(650)) },
-            label = "login-background"
-        ) { index ->
-            AsyncImage(
-                model = images.getOrNull(index),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+    Box(Modifier.fillMaxSize().padding(pad).background(MaterialTheme.colorScheme.background)) {
+        if (images.isNotEmpty()) {
+            AnimatedContent(
+                targetState = imageIndex.coerceIn(0, images.lastIndex),
+                transitionSpec = { fadeIn(tween(650)) togetherWith fadeOut(tween(650)) },
+                label = "login-background"
+            ) { index ->
+                SubcomposeAsyncImage(
+                    model = images.getOrNull(index),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                ) {
+                    if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                    else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                }
+            }
         }
-        Box(Modifier.fillMaxSize().background(BrandInk.copy(alpha = 0.70f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
         Box(Modifier.fillMaxSize().background(BrushVerticalShade()))
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(BrandViolet), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.VideogameAsset, null, Modifier.size(27.dp), tint = Color.White)
-                }
-                Column {
-                    Text("DEADSMILE GAMES", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Seu universo de jogos", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
-                }
-            }
-            Spacer(Modifier.height(22.dp))
             Card(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 460.dp),
                 shape = RoundedCornerShape(28.dp),
@@ -1068,8 +1467,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Text("Notícias e jogos em um só lugar.", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -1077,7 +1474,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 @Composable
 private fun BrushVerticalShade(): androidx.compose.ui.graphics.Brush =
     androidx.compose.ui.graphics.Brush.verticalGradient(
-        colors = listOf(Color(0xAA090810), Color(0x33090810), Color(0xDD090810))
+        colors = listOf(Color(0xAA000000), Color(0x33000000), Color(0xDD000000))
     )
 
 
@@ -1087,16 +1484,24 @@ private fun AccountAvatar(url: String?, modifier: Modifier = Modifier) {
     when {
         bitmap != null -> Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "Foto do perfil",
+            contentDescription = AppI18n.translate(LocalContext.current, "Foto do perfil"),
             modifier = modifier.clip(CircleShape),
             contentScale = ContentScale.Crop
         )
-        !url.isNullOrBlank() -> AsyncImage(
+        !url.isNullOrBlank() -> SubcomposeAsyncImage(
             model = url,
             contentDescription = "Foto do perfil",
-            modifier = modifier.clip(CircleShape),
+            modifier = modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentScale = ContentScale.Crop
-        )
+        ) {
+            if (painter.state is AsyncImagePainter.State.Success) {
+                SubcomposeAsyncImageContent()
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.AccountCircle, null, Modifier.fillMaxSize().padding(4.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        }
         else -> Box(
             modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
@@ -1146,10 +1551,9 @@ private fun SettingsScreen(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
-    accentPalette: Int,
-    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
-    onReduceMotion: (Boolean) -> Unit
+    onReduceMotion: (Boolean) -> Unit,
+    onOpenUpdates: () -> Unit
 ) {
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -1164,7 +1568,7 @@ private fun SettingsScreen(
             Card(shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Aparência", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    listOf("Seguir o sistema", "Claro", "Escuro").forEachIndexed { index, label ->
+                    listOf("Seguir o sistema", "Claro", "Escuro", "OLED (preto puro)").forEachIndexed { index, label ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onThemeMode(index) }.padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -1180,24 +1584,6 @@ private fun SettingsScreen(
                         checked = dynamicColors,
                         onCheckedChange = onDynamicColors
                     )
-                    Text("Cor de destaque", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    val swatches = listOf(
-                        Triple("Violeta", Color(0xFF5B4BCC), Color(0xFFB8AEFF)),
-                        Triple("Rosa", Color(0xFFB4234F), Color(0xFFFF9DB0)),
-                        Triple("Verde-água", Color(0xFF176B65), Color(0xFF8AD8CF)),
-                        Triple("Azul", Color(0xFF2458B8), Color(0xFF9CBFFF))
-                    )
-                    swatches.forEachIndexed { index, palette ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onAccentPalette(index) }.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            RadioButton(selected = accentPalette == index && !dynamicColors, onClick = { onAccentPalette(index) })
-                            Box(Modifier.size(26.dp).clip(CircleShape).background(if (themeMode == 2) palette.third else palette.second))
-                            Text(palette.first, Modifier.weight(1f))
-                        }
-                    }
                 }
             }
         }
@@ -1227,8 +1613,16 @@ private fun SettingsScreen(
             Card(shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sobre", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Deadsmile Games para Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Conteúdo conectado à plataforma Deadsmile. A biblioteca mostra seus jogos para PC; instalações no Android não estão disponíveis.", style = MaterialTheme.typography.bodyMedium)
+                    Text("Deadsmile Games Companion for Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        item {
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Atualizações", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Consulte o histórico de versões e os APKs publicados no GitHub.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onOpenUpdates, modifier = Modifier.fillMaxWidth()) { Text("Ver histórico de atualizações") }
                 }
             }
         }
@@ -1333,7 +1727,9 @@ private fun Empty(message: String) {
 
 private fun openExternal(context: Context, value: String) {
     runCatching {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(value)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val uri = Uri.parse(value)
+        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank() && uri.userInfo.isNullOrEmpty())
+        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
 }
