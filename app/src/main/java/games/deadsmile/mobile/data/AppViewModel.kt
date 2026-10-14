@@ -541,7 +541,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(busy = true)
         try { withContext(Dispatchers.IO) { api.post("/auth/logout", JSONObject()) } } catch (_: Exception) { }
         withContext(Dispatchers.IO) { api.clearSession() }
-        mutable.value = mutable.value.copy(user = null, accountProfile = null, library = emptyList(), wishlist = emptyList(), sessions = emptyList(), busy = false, twoFactor = false, accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "", message = "Você saiu da conta.")
+        restartRealtimeForSessionChange()
+        mutable.value = mutable.value.copy(
+            user = null,
+            accountProfile = null,
+            library = emptyList(),
+            wishlist = emptyList(),
+            sessions = emptyList(),
+            privacy = PrivacyOptions(),
+            accountLoading = false,
+            busy = false,
+            twoFactor = false,
+            accountTwoFactorEnabled = false,
+            twoFactorSetupSecret = "",
+            twoFactorSetupUri = "",
+            message = "Você saiu da conta."
+        )
     }
     fun dismiss() { mutable.value = mutable.value.copy(message = null, error = null) }
     private fun safe(e: Exception): String {
