@@ -501,7 +501,6 @@ private fun DeadsmileRoot(
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
             }
-            }
         }
         if (tourStage == 0) {
             TourWelcomeOverlay(
@@ -783,15 +782,6 @@ private fun GameDetailsScreen(
                     ))
                 }
                 Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
-                        Text(
-                            if (isGame) "CATÁLOGO DEADSMILE" else "DEADSMILE · CONTEÚDO",
-                            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                     Text(item.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
@@ -1321,13 +1311,13 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                 state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
                 state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
             ).distinct().take(18)
-            .ifEmpty { listOf(ReferenceArtwork) }
+            
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
-        while (true) {
+        while (images.isNotEmpty()) {
             delay(3000)
-            imageIndex = if (images.isEmpty()) 0 else (imageIndex + 1) % images.size
+            imageIndex = (imageIndex + 1) % images.size
         }
     }
 
@@ -1344,23 +1334,13 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                 contentScale = ContentScale.Crop
             )
         }
-        Box(Modifier.fillMaxSize().background(BrandInk.copy(alpha = 0.70f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
         Box(Modifier.fillMaxSize().background(BrushVerticalShade()))
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(BrandViolet), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.VideogameAsset, null, Modifier.size(27.dp), tint = Color.White)
-                }
-                Column {
-                    Text("DEADSMILE GAMES COMPANION", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Catálogo, conta e novidades da plataforma", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
-                }
-            }
-            Spacer(Modifier.height(22.dp))
             Card(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 460.dp),
                 shape = RoundedCornerShape(28.dp),
@@ -1422,8 +1402,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Text("Catálogo, notícias e conta conectados à plataforma Deadsmile.", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -1431,7 +1409,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
 @Composable
 private fun BrushVerticalShade(): androidx.compose.ui.graphics.Brush =
     androidx.compose.ui.graphics.Brush.verticalGradient(
-        colors = listOf(Color(0xAA090810), Color(0x33090810), Color(0xDD090810))
+        colors = listOf(Color(0xAA000000), Color(0x33000000), Color(0xDD000000))
     )
 
 
