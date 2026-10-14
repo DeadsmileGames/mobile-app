@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -693,21 +694,36 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
-    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-                item(key = "companion-welcome") {
-                    Card(Modifier.width(320.dp).height(300.dp), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text("Catálogo de jogos, newswire, vídeos e biblioteca para PC.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(Modifier.weight(1f))
-                            Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Explorar jogos") }
-                            OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Newswire") }
+            val hero = state.games.firstOrNull { it.title.contains("abby", true) && it.title.contains("restless", true) } ?: state.games.firstOrNull()
+            Card(Modifier.fillMaxWidth().height(310.dp), shape = RoundedCornerShape(28.dp)) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                    hero?.image?.let { heroImage ->
+                        SubcomposeAsyncImage(model = heroImage, contentDescription = hero.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                            if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                            else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh))
+                        }
+                    }
+                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))))
+                    Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("DEADSMILE GAMES", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = .88f), fontWeight = FontWeight.Bold)
+                        Text(hero?.title ?: "Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(hero?.summary ?: "Jogos, notícias e novidades da Deadsmile.", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = .88f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { if (hero != null) openGame(hero) else openCatalog() }) { Text("Ver jogo") }
+                            OutlinedButton(onClick = openCatalog, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("Explorar catálogo") }
                         }
                     }
                 }
-                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes", compact = true) { openGame(game) } }
+            }
+        }
+        item {
+            Section("Seu catálogo", if (state.games.isEmpty()) "" else "Ver todos", openCatalog)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+                items(state.games.take(12), key = { "home-game-" + it.id }) { game ->
+                    FeedCard(game, Modifier.width(178.dp).height(276.dp), "Detalhes", compact = true) { openGame(game) }
+                }
             }
         }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
@@ -788,7 +804,7 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
         modifier = modifier.clickable(onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
-        Column {
+        Column(Modifier.fillMaxSize()) {
             if (item.image != null) {
                 Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                     SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
@@ -805,11 +821,11 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.fillMaxWidth().weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
-                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3)
+                Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3, overflow = TextOverflow.Ellipsis)
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -1237,6 +1253,13 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         )
                         OutlinedButton(onClick = { avatarPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
+                        }
+                        if (localAvatarPath != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                AccountAvatar(Uri.fromFile(File(localAvatarPath!!)).toString(), Modifier.size(54.dp))
+                                Text("Foto salva neste dispositivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { File(localAvatarPath!!).delete(); localAvatarPath = null; avatarPrefs.edit().remove("local_avatar_path").apply(); avatarPickerMessage = "Foto local removida." }) { Text("Remover") }
+                            }
                         }
                         if (avatarUrl.startsWith("data:image/")) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
