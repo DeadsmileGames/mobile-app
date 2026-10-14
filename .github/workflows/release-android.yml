@@ -2,10 +2,9 @@ name: Release Android
 
 on:
   push:
+    branches: [main]
     tags:
       - "v*"
-  pull_request:
-    types: [closed]
 
 permissions:
   contents: write
@@ -16,7 +15,7 @@ concurrency:
 
 jobs:
   signed-release:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'release/google-play-v1.1.0-final' && github.event.pull_request.base.ref == 'main')
+    if: github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.0'))
     name: Build and publish Android release assets
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -44,10 +43,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/verify_companion_design.py
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            TAG="v1.1.0"
-          else
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v1.1.0"
           fi
           VERSION="${TAG#v}"
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -143,10 +142,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            TAG="v1.1.0"
-          else
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v1.1.0"
           fi
           gh release create "$TAG" --target "$GITHUB_SHA" \
             "$DIRECT_APK_ASSET#Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" \
