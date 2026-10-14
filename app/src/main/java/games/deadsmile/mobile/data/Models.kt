@@ -35,6 +35,11 @@ data class FeedItem(
     val featured: Boolean = false,
     val platforms: List<String> = emptyList(),
     val ageRating: String = "",
+    val ratingSystem: String = "",
+    val ratingDescription: String = "",
+    val ratingDescriptors: List<String> = emptyList(),
+    val ratingDisclaimers: List<String> = emptyList(),
+    val ratingImageUrl: String? = null,
     val engine: String = "",
     val version: String = "",
     val trailerUrl: String? = null,
@@ -129,6 +134,7 @@ private fun JSONArray.strings(): List<String> = buildList {
 private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Boolean): FeedItem {
     val title = o.firstText("title", "name", "gameTitle", "game_title").ifBlank { "Sem título" }
     val storeInfo = o.optJSONObject("microsoftStore") ?: o.optJSONObject("microsoftStoreBadge")
+    val primaryRating = o.optJSONObject("primaryRating") ?: storeInfo?.optJSONObject("primaryRating")
     val slug = o.firstText("slug", "newsSlug", "gameSlug")
     val id = o.firstText("id", "uuid", "gameId", "game_id").ifBlank { slug.ifBlank { fallbackId } }
     val image = resolveAssetUrl(o.firstText(
@@ -207,7 +213,17 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         featured = o.optBoolean("featured", false),
         platforms = (o.optJSONArray("platforms") ?: JSONArray()).strings(),
         ageRating = o.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age")
-            .ifBlank { storeInfo?.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age").orEmpty() },
+            .ifBlank { storeInfo?.firstText("ageRating", "age_rating", "contentRating", "content_rating", "minimumAge", "minimum_age").orEmpty() }
+            .ifBlank {
+                val label = primaryRating?.firstText("label").orEmpty()
+                val age = primaryRating?.optInt("age", -1)?.takeIf { it >= 0 }?.let { "$it+" }.orEmpty()
+                listOf(label, age).filter { it.isNotBlank() }.distinct().joinToString(" · ")
+            },
+        ratingSystem = o.firstText("ratingSystem", "rating_system").ifBlank { primaryRating?.firstText("system").orEmpty() },
+        ratingDescription = o.firstText("ratingDescription", "rating_description").ifBlank { primaryRating?.firstText("description").orEmpty() },
+        ratingDescriptors = (o.optJSONArray("ratingDescriptors") ?: primaryRating?.optJSONArray("descriptors") ?: JSONArray()).strings(),
+        ratingDisclaimers = (o.optJSONArray("ratingDisclaimers") ?: primaryRating?.optJSONArray("disclaimers") ?: JSONArray()).strings(),
+        ratingImageUrl = primaryRating?.firstText("imageUrl", "image_url").orEmpty().takeIf { it.startsWith("https://", ignoreCase = true) },
         engine = o.firstText("engine", "gameEngine", "game_engine"),
         version = o.firstText("version", "gameVersion", "game_version"),
         trailerUrl = o.firstText("trailerUrl", "trailer_url", "trailer", "backgroundVideo", "background_video")
@@ -266,6 +282,11 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         featured = if (detail.has("featured")) parsed.featured else fallback.featured,
         platforms = parsed.platforms.ifEmpty { fallback.platforms },
         ageRating = parsed.ageRating.ifBlank { fallback.ageRating },
+        ratingSystem = parsed.ratingSystem.ifBlank { fallback.ratingSystem },
+        ratingDescription = parsed.ratingDescription.ifBlank { fallback.ratingDescription },
+        ratingDescriptors = parsed.ratingDescriptors.ifEmpty { fallback.ratingDescriptors },
+        ratingDisclaimers = parsed.ratingDisclaimers.ifEmpty { fallback.ratingDisclaimers },
+        ratingImageUrl = parsed.ratingImageUrl ?: fallback.ratingImageUrl,
         engine = parsed.engine.ifBlank { fallback.engine },
         version = parsed.version.ifBlank { fallback.version },
         trailerUrl = parsed.trailerUrl ?: fallback.trailerUrl,
