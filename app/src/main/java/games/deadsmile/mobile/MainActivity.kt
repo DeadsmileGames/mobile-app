@@ -778,7 +778,7 @@ private fun Home(
             Section("Seu catálogo", if (state.games.isEmpty()) "" else "Ver todos", openCatalog)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
                 items(state.games.take(12), key = { "home-game-" + it.id }) { game ->
-                    FeedCard(game, Modifier.width(178.dp).height(276.dp), "Detalhes", compact = true) { openGame(game) }
+                    FeedCard(game, Modifier.width(178.dp).height(276.dp), "Detalhes", compact = true, preferPoster = true) { openGame(game) }
                 }
             }
         }
@@ -791,7 +791,7 @@ private fun Home(
         item { Section("Vídeos", if (state.videos.isEmpty()) "" else "Ver todos", videos) }
         if (state.loading && state.videos.isEmpty()) item { LoadingRow() }
         else if (state.videos.isEmpty()) item { Empty("Novos vídeos aparecerão aqui quando estiverem disponíveis.") }
-        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.videos.take(8), key = { "home-video-" + it.id }) { video -> FeedCard(video, Modifier.width(250.dp).height(258.dp), "Detalhes") { openStory(video) } } } }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.videos.take(8), key = { "home-video-" + it.id }) { video -> VideoThumbnailCard(video, Modifier.width(250.dp).height(141.dp)) { openStory(video) } } } }
     }
 }
 @Composable
@@ -805,7 +805,8 @@ private fun Section(title: String, action: String, onClick: () -> Unit) {
 @Composable
 private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
     var query by rememberSaveable(title) { mutableStateOf("") }
-    val searchable = title == "Catálogo de jogos" || title == "Últimas notícias" || title == "Vídeos"
+    val isVideoFeed = title.equals("Vídeos", ignoreCase = true) || title.equals("Videos", ignoreCase = true)
+    val searchable = title == "Catálogo de jogos" || title == "Últimas notícias" || isVideoFeed
     val filtered = remember(content, query) {
         val term = query.trim()
         if (term.isBlank()) content else content.filter {
@@ -848,8 +849,14 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
         }
         if (filtered.isEmpty()) {
             item { Empty("Nenhum resultado para essa busca. Tente outro termo.") }
+        } else if (isVideoFeed) {
+            items(filtered, key = { it.id }) { video ->
+                VideoThumbnailCard(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f)) { open(video) }
+            }
         } else {
-            items(filtered, key = { it.id }) { item -> FeedCard(item, Modifier.fillMaxWidth().height(292.dp)) { open(item) } }
+            items(filtered, key = { it.id }) { item ->
+                FeedCard(item, Modifier.fillMaxWidth().height(292.dp)) { open(item) }
+            }
         }
     }
 }
@@ -893,7 +900,7 @@ private fun GameArtwork(item: FeedItem, modifier: Modifier = Modifier, contentSc
 }
 
 @Composable
-private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
+private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, preferPoster: Boolean = false, open: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -907,7 +914,7 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
     ) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 136.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                GameArtwork(item, Modifier.fillMaxSize())
+                GameArtwork(if (preferPoster && !item.posterImage.isNullOrBlank()) item.copy(image = item.posterImage) else item, Modifier.fillMaxSize())
             }
             Column(Modifier.fillMaxWidth().weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
@@ -917,6 +924,48 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
                 if (excerpt.isNotBlank()) Text(excerpt, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (!compact && item.status.isNotBlank()) 1 else 3, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.weight(1f))
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoThumbnailCard(
+    item: FeedItem,
+    modifier: Modifier = Modifier,
+    open: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.975f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "video-thumbnail-press"
+    )
+    Card(
+        modifier = modifier.animateContentSize()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = interaction, indication = null, onClick = open),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+            GameArtwork(item, Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .78f)))
+            ))
+            Box(
+                Modifier.align(Alignment.Center).size(58.dp).clip(CircleShape).background(Color.Black.copy(alpha = .60f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Outlined.PlayArrow, contentDescription = AppI18n.translate(LocalContext.current, "Reproduzir vídeo"),
+                    modifier = Modifier.size(38.dp), tint = Color.White)
+            }
+            Surface(
+                modifier = Modifier.align(Alignment.BottomStart).padding(10.dp).fillMaxWidth(.92f),
+                color = Color.Black.copy(alpha = .70f), shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(item.title, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -1930,13 +1979,21 @@ private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: Pa
     }
     Column(Modifier.fillMaxSize().padding(pad)) {
         OutlinedTextField(
-            value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             placeholder = { Text("Buscar jogos") }, singleLine = true,
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-            trailingIcon = { if (query.isNotBlank()) IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, contentDescription = "Limpar busca") } }
+            trailingIcon = {
+                if (query.isNotBlank()) IconButton(onClick = { query = "" }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Limpar busca")
+                }
+            }
         )
         if (filtered.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) { Empty(if (content.isEmpty()) "O catálogo não está disponível agora. Tente atualizar em alguns instantes." else "Nenhum jogo corresponde à busca.") }
+            Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) {
+                Empty(if (content.isEmpty()) "O catálogo não está disponível agora. Tente atualizar em alguns instantes." else "Nenhum jogo corresponde à busca.")
+            }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 156.dp),
@@ -1947,19 +2004,20 @@ private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: Pa
             ) {
                 gridItems(filtered, key = { it.id }) { game ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().height(276.dp).clickable { open(game) },
+                        modifier = Modifier.fillMaxWidth().animateContentSize().clickable { open(game) },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
-                        Column(Modifier.fillMaxSize()) {
-                            Box(Modifier.fillMaxWidth().height(156.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-                                GameArtwork(game, Modifier.fillMaxSize())
+                        Column(Modifier.fillMaxWidth()) {
+                            Box(Modifier.fillMaxWidth().aspectRatio(0.68f).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                                val poster = game.posterImage?.takeIf { it.isNotBlank() } ?: game.image
+                                GameArtwork(if (poster != game.image) game.copy(image = poster) else game, Modifier.fillMaxSize())
                             }
-                            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(game.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(game.summary.ifBlank { game.genres.take(2).joinToString(" · ") }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Spacer(Modifier.weight(1f))
-                                Text("Ver detalhes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                                val subtitle = game.summary.ifBlank { game.genres.take(2).joinToString(" · ") }
+                                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text("Ver detalhes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
