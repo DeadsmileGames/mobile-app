@@ -33,6 +33,34 @@ jobs:
         run: gradle --no-daemon --stacktrace tasks
       - name: Run unit tests
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
+      - name: Build unsigned production variants for release smoke test
+        run: gradle --no-daemon --stacktrace assembleDirectRelease assemblePlayRelease bundlePlayRelease -PappVersionName=1.1.0 -PappVersionCode=1001000
+      - name: Verify production variant manifests and artifacts
+        run: |
+          set -euo pipefail
+          DIRECT_APK=app/build/outputs/apk/direct/release/app-direct-release.apk
+          PLAY_APK=app/build/outputs/apk/play/release/app-play-release.apk
+          PLAY_AAB=app/build/outputs/bundle/playRelease/app-play-release.aab
+          test -s "$DIRECT_APK"
+          test -s "$PLAY_APK"
+          test -s "$PLAY_AAB"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$AAPT"
+          for APK in "$DIRECT_APK" "$PLAY_APK"; do
+            BADGING="$("$AAPT" dump badging "$APK")"
+            printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='1001000' versionName='1.1.0'"
+            printf '%s\n' "$BADGING" | grep -F "application-label:'Deadsmile Games'"
+            printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
+          done
+          DIRECT_PERMS="$("$AAPT" dump permissions "$DIRECT_APK")"
+          PLAY_PERMS="$("$AAPT" dump permissions "$PLAY_APK")"
+          printf '%s\n' "$DIRECT_PERMS" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"
+          if printf '%s\n' "$PLAY_PERMS" | grep -Fq "android.permission.REQUEST_INSTALL_PACKAGES"; then
+            echo "Play flavor must not request REQUEST_INSTALL_PACKAGES."
+            exit 1
+          fi
+          unzip -tq "$PLAY_AAB"
+          sha256sum "$DIRECT_APK" "$PLAY_APK" "$PLAY_AAB"
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDirectDebug
       - name: Verify APK exists
