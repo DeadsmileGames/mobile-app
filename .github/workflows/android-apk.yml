@@ -27,6 +27,8 @@ jobs:
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96
         with:
           gradle-version: '8.13'
+      - name: Verify Companion UI and localization contracts
+        run: python3 scripts/verify_companion_design.py
       - name: Verify project
         run: gradle --no-daemon --stacktrace tasks
       - name: Run unit tests
