@@ -368,6 +368,11 @@ private fun DeadsmileRoot(
         }
     }
 
+    if (appLanguage.isBlank()) {
+        LanguageSelectionOverlay(onSelect = onAppLanguage)
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -576,7 +581,6 @@ private fun DeadsmileRoot(
             )
         }
     }
-    if (appLanguage.isBlank()) LanguageSelectionOverlay(onSelect = onAppLanguage)
     if (showInstallPermissionDialog && pendingUpdateFile != null) {
         AlertDialog(
             onDismissRequest = { showInstallPermissionDialog = false },
