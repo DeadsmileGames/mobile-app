@@ -24,12 +24,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.material3.Text as MaterialText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.LocalTextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import games.deadsmile.mobile.data.GitHubRelease
@@ -205,3 +209,21 @@ private fun formatBytes(value: Long): String = when {
     value >= 1024L -> String.format(Locale.ROOT, "%.1f KiB", value / 1024.0)
     else -> "$value B"
 }
+
+@Composable
+private fun Text(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified,
+    fontWeight: FontWeight? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip
+) {
+    MaterialText(
+        text = AppI18n.translate(LocalContext.current, text),
+        modifier = modifier, style = style, color = color, fontWeight = fontWeight,
+        maxLines = maxLines, overflow = overflow
+    )
+}
+
