@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -522,6 +523,7 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
 
 @Composable
 private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) {
+    val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
@@ -668,7 +670,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) 
                         TextButton(onClick = { registerMode = !registerMode }, modifier = Modifier.fillMaxWidth()) {
                             Text(if (registerMode) "Já tenho uma conta" else "Criar uma conta")
                         }
-                        TextButton(onClick = { openExternal(LocalContext.current, "https://deadsmilegames.vercel.app") }, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { openExternal(context, "https://deadsmilegames.vercel.app") }, modifier = Modifier.fillMaxWidth()) {
                             Text("Precisa de ajuda com a conta?")
                         }
                     }
