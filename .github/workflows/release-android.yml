@@ -148,7 +148,7 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
-          gh release create "$TAG" \
+          gh release create "$TAG" --target "$GITHUB_SHA" \
             "$DIRECT_APK_ASSET#Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" \
             "$PLAY_AAB_ASSET#Deadsmile-Games-Play-Store-v$APP_VERSION_NAME.aab" \
             "$CHECKSUMS_ASSET#SHA256SUMS.txt" \
