@@ -226,8 +226,6 @@ private fun DeadsmileRoot(
     onThemeMode: (Int) -> Unit,
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
-    accentPalette: Int,
-    onAccentPalette: (Int) -> Unit,
     reduceMotion: Boolean,
     onReduceMotion: (Boolean) -> Unit
 ) {
@@ -238,6 +236,21 @@ private fun DeadsmileRoot(
     var detailIsGame by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
+    val preferences = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    var tourComplete by rememberSaveable { mutableStateOf(preferences.getBoolean("tour_completed", false)) }
+    var tourStage by rememberSaveable { mutableIntStateOf(if (tourComplete) -1 else 0) }
+    var tourFeedback by remember { mutableStateOf<String?>(null) }
+    val tourTargets = listOf(Page.HOME, Page.NEWS, Page.VIDEOS, Page.LIBRARY, Page.ACCOUNT)
+
+    var releases by remember { mutableStateOf<List<GitHubRelease>>(emptyList()) }
+    var releasesLoading by remember { mutableStateOf(true) }
+    var releaseError by remember { mutableStateOf<String?>(null) }
+    var updateBusyVersion by remember { mutableStateOf<String?>(null) }
+    var updateProgress by remember { mutableIntStateOf(0) }
+    var pendingUpdateFile by remember { mutableStateOf<File?>(null) }
+    var showInstallPermissionDialog by remember { mutableStateOf(false) }
+    var autoUpdateError by remember { mutableStateOf<String?>(null) }
+    val updateScope = rememberCoroutineScope()
 
     LaunchedEffect(state.message, state.error) {
         (state.error ?: state.message)?.let {
@@ -248,7 +261,82 @@ private fun DeadsmileRoot(
     LaunchedEffect(page, detailItem?.id, detailItem?.slug, detailIsGame) {
         if (page == Page.DETAILS) detailItem?.let { vm.loadDetails(it, detailIsGame) }
     }
-    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES) {
+    LaunchedEffect(tourFeedback) {
+        val message = tourFeedback ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        tourFeedback = null
+    }
+    LaunchedEffect(autoUpdateError) {
+        val message = autoUpdateError ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        autoUpdateError = null
+    }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val file = pendingUpdateFile
+        if (file != null && file.exists() && GitHubReleaseRepository.canInstall(context)) {
+            runCatching { GitHubReleaseRepository.install(context, file) }
+                .onFailure { autoUpdateError = it.message ?: "Não foi possível abrir o instalador." }
+            showInstallPermissionDialog = false
+        }
+    }
+
+    val beginUpdateDownload: (GitHubRelease) -> Unit = { release ->
+        updateScope.launch {
+            if (BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") {
+                autoUpdateError = "A instalação automática exige a versão de distribuição assinada."
+            } else {
+                updateBusyVersion = release.version
+                updateProgress = 0
+                releaseError = null
+                try {
+                    val cached = GitHubReleaseRepository.cachedFile(context, release)
+                    val file = if (cached != null && cached.isFile && cached.length() > 0L) cached
+                    else GitHubReleaseRepository.download(context, release) { percent -> updateProgress = percent }
+                    pendingUpdateFile = file
+                    if (GitHubReleaseRepository.canInstall(context)) {
+                        GitHubReleaseRepository.install(context, file)
+                    } else {
+                        showInstallPermissionDialog = true
+                    }
+                } catch (error: Exception) {
+                    autoUpdateError = error.message ?: "Não foi possível baixar ou preparar a atualização."
+                } finally {
+                    updateBusyVersion = null
+                }
+            }
+        }
+    }
+
+    fun refreshReleases() {
+        updateScope.launch {
+            releasesLoading = true
+            releaseError = null
+            try {
+                releases = GitHubReleaseRepository.fetchReleases()
+            } catch (error: Exception) {
+                releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
+            } finally {
+                releasesLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        releasesLoading = true
+        releaseError = null
+        try {
+            releases = GitHubReleaseRepository.fetchReleases()
+            val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME)
+            if (newest != null && BuildConfig.APPLICATION_ID == "games.deadsmile.mobile") beginUpdateDownload(newest)
+        } catch (error: Exception) {
+            releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
+        } finally {
+            releasesLoading = false
+        }
+    }
+
+    BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
         page = if (page == Page.GAMES) Page.HOME else returnPage
     }
 
