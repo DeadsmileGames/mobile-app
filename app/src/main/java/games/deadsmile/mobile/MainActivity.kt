@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -63,6 +62,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Close
@@ -72,7 +73,10 @@ import androidx.compose.material.icons.outlined.VideogameAsset
 import androidx.compose.material3.*
 import androidx.compose.material3.Text as MaterialText
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -113,7 +117,6 @@ import games.deadsmile.mobile.data.GitHubReleaseRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
@@ -123,6 +126,30 @@ private enum class Page(val label: String) {
 }
 
 private val BrandInk = Color(0xFF101010)
+private val FirsNeueTextFamily = FontFamily(Font(R.font.tt_firs_neue_demi_bold, weight = FontWeight.Normal))
+private val PoppinsNumberFamily = FontFamily(
+    Font(R.font.poppins_regular, weight = FontWeight.Normal),
+    Font(R.font.poppins_bold, weight = FontWeight.Bold)
+)
+private val DefaultTypography = Typography()
+private val DeadsmileTypography = Typography(
+    displayLarge = DefaultTypography.displayLarge.copy(fontFamily = FirsNeueTextFamily),
+    displayMedium = DefaultTypography.displayMedium.copy(fontFamily = FirsNeueTextFamily),
+    displaySmall = DefaultTypography.displaySmall.copy(fontFamily = FirsNeueTextFamily),
+    headlineLarge = DefaultTypography.headlineLarge.copy(fontFamily = FirsNeueTextFamily),
+    headlineMedium = DefaultTypography.headlineMedium.copy(fontFamily = FirsNeueTextFamily),
+    headlineSmall = DefaultTypography.headlineSmall.copy(fontFamily = FirsNeueTextFamily),
+    titleLarge = DefaultTypography.titleLarge.copy(fontFamily = FirsNeueTextFamily),
+    titleMedium = DefaultTypography.titleMedium.copy(fontFamily = FirsNeueTextFamily),
+    titleSmall = DefaultTypography.titleSmall.copy(fontFamily = FirsNeueTextFamily),
+    bodyLarge = DefaultTypography.bodyLarge.copy(fontFamily = FirsNeueTextFamily),
+    bodyMedium = DefaultTypography.bodyMedium.copy(fontFamily = FirsNeueTextFamily),
+    bodySmall = DefaultTypography.bodySmall.copy(fontFamily = FirsNeueTextFamily),
+    labelLarge = DefaultTypography.labelLarge.copy(fontFamily = FirsNeueTextFamily),
+    labelMedium = DefaultTypography.labelMedium.copy(fontFamily = FirsNeueTextFamily),
+    labelSmall = DefaultTypography.labelSmall.copy(fontFamily = FirsNeueTextFamily)
+)
+private val NumericRunPattern = Regex("""(?<![\p{L}\p{N}])\d+(?:[.,:/\-–]\d+)*(?:%|\+)?""")
 
 @Composable
 private fun Text(
@@ -144,8 +171,17 @@ private fun Text(
     onTextLayout: (TextLayoutResult) -> Unit = {},
     style: TextStyle = LocalTextStyle.current
 ) {
+    val translated = AppI18n.translate(LocalContext.current, text)
+    val numberedText = remember(translated) {
+        buildAnnotatedString {
+            append(translated)
+            NumericRunPattern.findAll(translated).forEach { match ->
+                addStyle(SpanStyle(fontFamily = PoppinsNumberFamily), match.range.first, match.range.last + 1)
+            }
+        }
+    }
     MaterialText(
-        text = AppI18n.translate(LocalContext.current, text),
+        text = numberedText,
         modifier = modifier,
         color = color,
         fontSize = fontSize,
@@ -229,7 +265,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
             primary = Color(0xFF454545), secondary = Color(0xFF626262), tertiary = Color(0xFF777777)
         )
     }
-    MaterialTheme(colorScheme = scheme) {
+    MaterialTheme(colorScheme = scheme, typography = DeadsmileTypography) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             DeadsmileRoot(
                 vm = vm,
@@ -389,12 +425,7 @@ private fun DeadsmileRoot(
             TopAppBar(
                 title = {
                     if (page == Page.DETAILS) {
-                        MaterialText(
-                            text = detailItem?.title.orEmpty(),
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Spacer(Modifier.width(1.dp))
                     } else {
                         val title = when (page) {
                             Page.HOME -> "Início"
@@ -628,8 +659,14 @@ private fun TourWelcomeOverlay(onStart: () -> Unit, onSkip: () -> Unit) {
 
 @Composable
 private fun TourStepOverlay(title: String, description: String, onSkip: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)).padding(horizontal = 16.dp, vertical = 12.dp), contentAlignment = Alignment.BottomCenter) {
-        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp).padding(bottom = 12.dp), shape = RoundedCornerShape(24.dp)) {
+    Box(
+        Modifier.fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.68f))
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp).padding(bottom = 4.dp), shape = RoundedCornerShape(24.dp)) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1260,25 +1297,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var profileBio by rememberSaveable { mutableStateOf("") }
     var websiteUrl by rememberSaveable { mutableStateOf("") }
     var location by rememberSaveable { mutableStateOf("") }
-    var avatarUrl by rememberSaveable { mutableStateOf("") }
-    var avatarUrlInput by rememberSaveable { mutableStateOf("") }
-    var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    val avatarPrefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
-    val avatarPreferenceKey = remember(state.user?.email, state.user?.username) {
-        "local_avatar_path_" + (state.user?.email.orEmpty().ifBlank { state.user?.username.orEmpty() }.lowercase(java.util.Locale.ROOT).hashCode())
-    }
-    var localAvatarPath by rememberSaveable(avatarPreferenceKey) { mutableStateOf(avatarPrefs.getString(avatarPreferenceKey, null)) }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
-    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val saved = runCatching { copyProfileImage(context, uri, avatarPreferenceKey) }.getOrNull()
-        if (saved == null) avatarPickerMessage = "Não foi possível ler essa foto. Tente uma imagem JPG, PNG ou WebP."
-        else {
-            localAvatarPath = saved.absolutePath
-            avatarPrefs.edit().putString(avatarPreferenceKey, saved.absolutePath).apply()
-            avatarPickerMessage = "Foto salva apenas neste dispositivo; o envio para a conta não está disponível."
-        }
-    }
     var showEmailForm by rememberSaveable { mutableStateOf(false) }
     var newEmail by rememberSaveable { mutableStateOf("") }
     var currentPassword by rememberSaveable { mutableStateOf("") }
@@ -1294,8 +1313,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             profileBio = profile.bio
             websiteUrl = profile.websiteUrl
             location = profile.location
-            avatarUrl = profile.avatarUrl
-            avatarUrlInput = profile.avatarUrl.takeUnless { it.startsWith("data:image/") }.orEmpty()
         }
     }
     LaunchedEffect(state.privacy) {
@@ -1313,7 +1330,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             Card(shape = RoundedCornerShape(26.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        AccountAvatar(localAvatarPath?.let { Uri.fromFile(File(it)).toString() } ?: profile?.avatarUrl, Modifier.size(68.dp))
+                        AccountAvatar(profile?.avatarUrl, Modifier.size(68.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(profile?.fullName?.ifBlank { state.user.username } ?: state.user.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text("@" + (profile?.username?.ifBlank { state.user.username } ?: state.user.username), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1327,37 +1344,9 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(location, { location = it.take(120) }, label = { Text("Localização") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(
-                            value = avatarUrlInput,
-                            onValueChange = { avatarUrlInput = it.take(5000); avatarUrl = avatarUrlInput },
-                            label = { Text("URL da foto (opcional)") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedButton(onClick = { avatarPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Outlined.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
-                        }
-                        if (localAvatarPath != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                AccountAvatar(Uri.fromFile(File(localAvatarPath!!)).toString(), Modifier.size(54.dp))
-                                Text("Foto salva neste dispositivo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                TextButton(onClick = { File(localAvatarPath!!).delete(); localAvatarPath = null; avatarPrefs.edit().remove(avatarPreferenceKey).apply(); avatarUrl = ""; avatarUrlInput = ""; avatarPickerMessage = "Foto removida."; vm.saveProfile(username, profileBio, websiteUrl, location, "") }, enabled = !state.busy) { Text("Remover") }
-                            }
-                        }
-                        if (avatarUrl.startsWith("data:image/")) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                AccountAvatar(avatarUrl, Modifier.size(54.dp))
-                                Text("Foto local selecionada", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                TextButton(onClick = { avatarUrl = ""; avatarUrlInput = "" }) { Text("Remover") }
-                            }
-                        }
-                        avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
                             onClick = {
-                                val safeRemoteAvatar = avatarUrlInput.trim().takeIf { it.startsWith("https://", ignoreCase = true) }
-                                    ?: profile?.avatarUrl?.takeIf { it.startsWith("https://", ignoreCase = true) }.orEmpty()
-                                vm.saveProfile(username, profileBio, websiteUrl, location, safeRemoteAvatar)
+                                vm.saveProfile(username, profileBio, websiteUrl, location)
                                 editingProfile = false
                             },
                             enabled = !state.busy && username.trim().length in 3..24,
@@ -1368,8 +1357,6 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                             profileBio = it.bio
                             websiteUrl = it.websiteUrl
                             location = it.location
-                            avatarUrl = it.avatarUrl
-                            avatarUrlInput = it.avatarUrl.takeUnless { value -> value.startsWith("data:image/") }.orEmpty()
                         } }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
                     } else {
                         if (profile?.bio?.isNotBlank() == true) Text(profile.bio, style = MaterialTheme.typography.bodyMedium)
@@ -1660,51 +1647,6 @@ private fun decodeProfileImage(value: String?): Bitmap? {
     if (comma < 0) return null
     val bytes = runCatching { Base64.decode(raw.substring(comma + 1), Base64.DEFAULT) }.getOrNull() ?: return null
     return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
-}
-
-private fun decodeProfileBitmap(context: Context, uri: Uri, maxDimension: Int): Bitmap? {
-    val resolver = context.contentResolver
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        val modern = runCatching {
-            val source = ImageDecoder.createSource(resolver, uri)
-            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
-                val longest = maxOf(info.size.width, info.size.height)
-                decoder.setTargetSampleSize((longest / maxDimension).coerceAtLeast(1))
-            }
-        }.getOrNull()
-        if (modern != null) return modern
-        // Fall back to BitmapFactory for unusual files not supported by this device's ImageDecoder.
-    }
-
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-    var sample = 1
-    while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension) sample *= 2
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    return runCatching { resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } }.getOrNull()
-}
-
-private fun scaleProfileBitmap(decoded: Bitmap, maxDimension: Int): Bitmap {
-    if (decoded.width <= maxDimension && decoded.height <= maxDimension) return decoded
-    val ratio = minOf(maxDimension.toFloat() / decoded.width, maxDimension.toFloat() / decoded.height)
-    return Bitmap.createScaledBitmap(
-        decoded,
-        (decoded.width * ratio).toInt().coerceAtLeast(1),
-        (decoded.height * ratio).toInt().coerceAtLeast(1),
-        true
-    )
-}
-
-private fun copyProfileImage(context: Context, uri: Uri, profileKey: String): File? {
-    val decoded = decodeProfileBitmap(context, uri, 1024) ?: return null
-    val scaled = scaleProfileBitmap(decoded, 768)
-    val destination = File(context.filesDir, "profile-avatar-${profileKey.hashCode()}.jpg")
-    val ok = runCatching { destination.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) } }.getOrDefault(false)
-    if (scaled !== decoded) scaled.recycle()
-    decoded.recycle()
-    return destination.takeIf { ok && it.isFile && it.length() > 0L }
 }
 
 @Composable
