@@ -56,6 +56,7 @@ fun UpdatesScreen(
     updateProgress: Int,
     autoUpdateError: String?,
     allowInstall: Boolean,
+    isPlayDistribution: Boolean,
     onRefresh: () -> Unit,
     onInstall: (GitHubRelease) -> Unit,
     onOpenRelease: (String) -> Unit
@@ -82,9 +83,10 @@ fun UpdatesScreen(
                 )
                 Text(
                     when {
-                        !allowInstall -> "Atualização automática disponível apenas na versão de distribuição assinada."
+                        isPlayDistribution -> "As atualizações desta versão são gerenciadas pela Google Play."
+                        !allowInstall -> "Atualizações automáticas disponíveis apenas no APK assinado para distribuição direta."
                         loading -> "Verificando as releases do GitHub…"
-                        releases.isEmpty() -> "Ainda não há releases publicadas para o Companion."
+                        releases.isEmpty() -> "Ainda não há releases publicadas para Deadsmile Games."
                         else -> "Histórico público de versões e arquivos disponibilizados pelo projeto."
                     },
                     style = MaterialTheme.typography.bodyMedium
@@ -167,7 +169,9 @@ fun UpdatesScreen(
                             }
                             HorizontalDivider()
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (release.apkUrl != null && isNewer) {
+                                if (release.apkUrl != null && isNewer && isPlayDistribution) {
+                                    Text("Esta versão será atualizada pela Google Play.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                } else if (release.apkUrl != null && isNewer) {
                                     Button(
                                         onClick = { onInstall(release) },
                                         enabled = allowInstall && updateBusyVersion == null && !release.prerelease && !release.draft,
