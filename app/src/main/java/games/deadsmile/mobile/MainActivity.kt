@@ -21,6 +21,9 @@ import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -30,6 +33,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -77,6 +82,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -399,7 +405,7 @@ private fun DeadsmileRoot(
                     }
                 },
                 actions = {
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.VIDEO_PLAYER) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Default.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
@@ -481,7 +487,7 @@ private fun DeadsmileRoot(
                     if (item.url != null && youtubeVideoId(item.url) != null) { videoItem = item; returnPage = Page.VIDEOS; page = Page.VIDEO_PLAYER }
                     else { detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS }
                 }
-                Page.LIBRARY -> LibraryScreen(state, pad) { page = Page.ACCOUNT }
+                Page.LIBRARY -> LibraryScreen(state, pad, goAccount = { page = Page.ACCOUNT }, openGame = { item -> detailItem = item; detailIsGame = true; returnPage = Page.LIBRARY; page = Page.DETAILS })
                 Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.ACCOUNT; page = Page.WISHLIST }
                 Page.WISHLIST -> WishlistScreen(
                     state = state,
@@ -802,8 +808,15 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
 
 @Composable
 private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "feed-card-press"
+    )
     Card(
-        modifier = modifier.clickable(onClick = open),
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clickable(interactionSource = interaction, indication = null, onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -1111,7 +1124,7 @@ private fun WishlistScreen(
 }
 
 @Composable
-private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> Unit) {
+private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> Unit, openGame: (FeedItem) -> Unit) {
     if (state.user == null) {
         Box(Modifier.fillMaxSize().padding(pad).padding(24.dp), contentAlignment = Alignment.Center) {
             Card(shape = RoundedCornerShape(24.dp)) {
@@ -1143,7 +1156,7 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
                 Text("Jogos vinculados à sua conta · somente consulta", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             items(state.library, key = { it.id }) { game ->
-                Card(shape = RoundedCornerShape(20.dp)) {
+                Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { openGame(game) }) {
                     Row(
                         Modifier.fillMaxWidth().padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
