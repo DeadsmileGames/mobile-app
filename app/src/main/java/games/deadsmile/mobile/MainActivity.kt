@@ -670,11 +670,20 @@ private fun GameDetailsScreen(
                     Text(if (isGame) "Capturas de tela" else "Imagens do artigo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(item.screenshots, key = { it }) { screenshot ->
-                            AsyncImage(
-                                screenshot, "Captura de tela de ${item.title}",
-                                Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)),
+                            SubcomposeAsyncImage(
+                                model = screenshot,
+                                contentDescription = "Captura de tela de ${item.title}",
+                                modifier = Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                                 contentScale = ContentScale.Crop
-                            )
+                            ) {
+                                if (painter.state is AsyncImagePainter.State.Success) {
+                                    SubcomposeAsyncImageContent()
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.ImageNotSupported, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1250,12 +1259,20 @@ private fun AccountAvatar(url: String?, modifier: Modifier = Modifier) {
             modifier = modifier.clip(CircleShape),
             contentScale = ContentScale.Crop
         )
-        !url.isNullOrBlank() -> AsyncImage(
+        !url.isNullOrBlank() -> SubcomposeAsyncImage(
             model = url,
             contentDescription = "Foto do perfil",
-            modifier = modifier.clip(CircleShape),
+            modifier = modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentScale = ContentScale.Crop
-        )
+        ) {
+            if (painter.state is AsyncImagePainter.State.Success) {
+                SubcomposeAsyncImageContent()
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.AccountCircle, null, Modifier.fillMaxSize().padding(4.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        }
         else -> Box(
             modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
