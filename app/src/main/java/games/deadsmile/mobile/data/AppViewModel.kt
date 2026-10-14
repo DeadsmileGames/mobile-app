@@ -177,7 +177,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun saveProfile(fullName: String, username: String, bio: String, websiteUrl: String, location: String, avatarUrl: String) = viewModelScope.launch {
+    fun saveProfile(username: String, bio: String, websiteUrl: String, location: String, avatarUrl: String) = viewModelScope.launch {
         if (mutable.value.busy) return@launch
         val user = mutable.value.user ?: return@launch
         mutable.value = mutable.value.copy(busy = true, error = null)
@@ -185,7 +185,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val fallback = mutable.value.accountProfile ?: AccountProfile(username = user.username, email = user.email, bio = user.bio)
             val result = withContext(Dispatchers.IO) {
                 api.patch("/account", JSONObject()
-                    .put("fullName", fullName.trim())
                     .put("username", username.trim())
                     .put("bio", bio)
                     .put("websiteUrl", websiteUrl.trim())
