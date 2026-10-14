@@ -584,6 +584,7 @@ private fun DeadsmileRoot(
                     updateProgress = updateProgress,
                     autoUpdateError = autoUpdateError,
                     allowInstall = (BuildConfig.IS_DIRECT_DISTRIBUTION && !BuildConfig.DEBUG),
+                    isPlayDistribution = !BuildConfig.IS_DIRECT_DISTRIBUTION,
                     onRefresh = ::refreshReleases,
                     onInstall = beginUpdateDownload,
                     onOpenRelease = { url -> openExternal(context, url) }
@@ -707,7 +708,7 @@ private fun TourThanksOverlay(onFinish: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
         Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
             Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Obrigado por conhecer o Companion!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Obrigado por conhecer Deadsmile Games!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text("Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Concluir e acessar a conta") }
             }
