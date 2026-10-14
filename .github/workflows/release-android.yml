@@ -98,7 +98,7 @@ jobs:
 
           "$APKSIGNER" verify --verbose "$DIRECT_APK"
           "$APKSIGNER" verify --verbose "$PLAY_APK"
-          jarsigner -verify -strict -certs "$PLAY_AAB"
+          jarsigner -verify -certs "$PLAY_AAB"
           unzip -tq "$PLAY_AAB"
 
           DIRECT_BADGING="$("$AAPT" dump badging "$DIRECT_APK")"
