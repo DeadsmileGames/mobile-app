@@ -15,11 +15,11 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
 
 android {
     namespace = "games.deadsmile.mobile"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
-        applicationId = "games.deadsmile.mobile"
+        applicationId = "com.deadsmilegames.companion"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = providers.gradleProperty("appVersionCode").orElse("1001000").get().toInt()
         versionName = providers.gradleProperty("appVersionName").orElse("1.1.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
