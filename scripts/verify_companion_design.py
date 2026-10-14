@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Static pre-build contracts for the Deadsmile Companion UI.
 
 These checks deliberately run before Gradle. They catch accidental removal of
@@ -62,8 +61,6 @@ def has_all(source: str, tokens: tuple[str, ...]) -> bool:
     return all(token in source for token in tokens)
 
 def is_balanced(source: str) -> bool:
-    # Curly delimiters inside Kotlin interpolation are balanced too. A raw count
-    # is a simple regression guard, not a Kotlin parser.
     return source.count("{") == source.count("}")
 
 def translation_keys(map_name: str) -> set[str]:
@@ -115,8 +112,6 @@ LOCALIZED_UI_KEYS = (
     "Confira os dados informados e tente novamente.",
 )
 
-# 25 shared contracts repeated against each screen's dependencies. This makes
-# the same language/navigation/runtime assumptions mandatory for every UI area.
 GLOBAL_CHECKS = [
     ("mandatory language-selection gate", lambda _: 'if (appLanguage.isBlank())' in MAIN),
     ("language chooser persists only explicit Portuguese choice", lambda _: 'onSelect("pt-BR")' in MAIN),
@@ -145,7 +140,6 @@ GLOBAL_CHECKS = [
     ("article detail respects endpoint entity type", lambda _: 'detailItem(item, preferGame = isGame)' in VM),
 ]
 
-# 15 contracts per named screen; positive and negative assertions are explicit.
 SCREEN_CHECKS: dict[str, list[tuple[str, bool]]] = {
     "Home": [
         ("renders game posters", True), ("uses image-first card", True), ("poster selection supported", True),
@@ -246,7 +240,6 @@ SCREEN_CHECKS: dict[str, list[tuple[str, bool]]] = {
     ],
 }
 
-# The structural contract adds 10 checks per screen. 50 * 13 screens = 650.
 def structure_checks(name: str, block: str) -> list[tuple[str, bool]]:
     return [
         (f"{name}: function found", bool(block)),
@@ -276,8 +269,6 @@ def check_screen(name: str) -> None:
     if len(checks) != 15:
         raise SystemExit(f"Internal audit error: {name} has {len(checks)} local checks, expected 15")
     for label, positive in checks:
-        # Tokens for each component are kept explicit to avoid ambiguous regex
-        # scans over a 2,000-line Compose file.
         tokens = FEATURE_TOKENS[name][label]
         present = all(token in block for token in tokens)
         run(f"{name}: {label}", present if positive else not present)
