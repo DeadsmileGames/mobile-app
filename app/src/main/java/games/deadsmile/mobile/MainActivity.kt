@@ -87,6 +87,9 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import games.deadsmile.mobile.data.AppViewModel
 import games.deadsmile.mobile.data.FeedItem
 import games.deadsmile.mobile.data.UiState
@@ -425,7 +428,13 @@ private fun Home(
     ) {
         item {
             Box(Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 340.dp).clip(RoundedCornerShape(28.dp)).background(BrandInk)) {
-                AsyncImage(model = heroImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                SubcomposeAsyncImage(model = heroImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                    if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
+                        Box(Modifier.fillMaxSize().background(BrandInk), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(52.dp), tint = Color.White.copy(alpha = 0.35f))
+                        }
+                    } else SubcomposeAsyncImageContent()
+                }
                 Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0x22090810), Color(0xC9090810), Color(0xF5090810)))))
                 Column(Modifier.align(Alignment.BottomStart).padding(22.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                     Surface(color = BrandViolet.copy(alpha = 0.95f), shape = RoundedCornerShape(8.dp)) {
@@ -529,7 +538,15 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
     ) {
         Column {
             if (item.image != null) {
-                Box(Modifier.fillMaxWidth().height(155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) { AsyncImage(item.image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                Box(Modifier.fillMaxWidth().height(155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                    SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
+                        if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else SubcomposeAsyncImageContent()
+                    }
+                }
             } else {
                 Box(
                     Modifier.fillMaxWidth().height(112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
@@ -1451,7 +1468,9 @@ private fun Empty(message: String) {
 
 private fun openExternal(context: Context, value: String) {
     runCatching {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(value)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val uri = Uri.parse(value)
+        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank() && uri.userInfo.isNullOrEmpty())
+        val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
 }
