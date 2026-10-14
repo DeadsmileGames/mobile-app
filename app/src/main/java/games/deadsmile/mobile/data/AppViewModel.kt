@@ -20,7 +20,14 @@ data class UiState(
     val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(),
     val user: UserAccount? = null, val loading: Boolean = true, val busy: Boolean = false,
     val twoFactor: Boolean = false, val message: String? = null, val error: String? = null,
-    val detail: FeedItem? = null, val detailLoading: Boolean = false
+    val detail: FeedItem? = null, val detailLoading: Boolean = false,
+    val accountProfile: AccountProfile? = null,
+    val accountLoading: Boolean = false,
+    val privacy: PrivacyOptions = PrivacyOptions(),
+    val sessions: List<ActiveSession> = emptyList(),
+    val accountTwoFactorEnabled: Boolean = false,
+    val twoFactorSetupSecret: String = "",
+    val twoFactorSetupUri: String = ""
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -128,8 +135,135 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun account() = viewModelScope.launch {
         val user = withContext(Dispatchers.IO) { runCatching { api.get("/auth/me").userAccount() }.getOrNull() }
         mutable.value = mutable.value.copy(user = user)
-        if (user != null) library()
+        if (user != null) {
+            library()
+            loadAccountSettings()
+        } else {
+            mutable.value = mutable.value.copy(accountProfile = null, sessions = emptyList(), privacy = PrivacyOptions(), accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "")
+        }
     }
+    fun loadAccountSettings() = viewModelScope.launch {
+        val user = mutable.value.user ?: return@launch
+        mutable.value = mutable.value.copy(accountLoading = true)
+        val fallback = AccountProfile(username = user.username, email = user.email, bio = user.bio)
+        val loaded = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val profile = async { runCatching { api.get("/account").accountProfile(fallback) }.getOrNull() }
+                val privacy = async { runCatching { api.get("/account/privacy").privacyOptions() }.getOrNull() }
+                val totp = async { runCatching { api.get("/account/totp/status") }.getOrNull() }
+                val sessions = async { runCatching { api.get("/account/sessions").activeSessions() }.getOrNull() }
+                listOf(profile.await(), privacy.await(), totp.await(), sessions.await())
+            }
+        }
+        val profile = loaded[0] as? AccountProfile
+        val privacy = loaded[1] as? PrivacyOptions
+        val totp = loaded[2] as? JSONObject
+        @Suppress("UNCHECKED_CAST")
+        val sessions = loaded[3] as? List<ActiveSession>
+        mutable.value = mutable.value.copy(
+            accountProfile = profile ?: mutable.value.accountProfile ?: fallback,
+            privacy = privacy ?: mutable.value.privacy,
+            sessions = sessions ?: mutable.value.sessions,
+            accountTwoFactorEnabled = totp?.optBoolean("enabled", false) ?: mutable.value.accountTwoFactorEnabled,
+            accountLoading = false
+        )
+    }
+
+    fun saveProfile(fullName: String, username: String, bio: String, websiteUrl: String, location: String, avatarUrl: String) = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        val user = mutable.value.user ?: return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            val fallback = mutable.value.accountProfile ?: AccountProfile(username = user.username, email = user.email, bio = user.bio)
+            val result = withContext(Dispatchers.IO) {
+                api.patch("/account", JSONObject()
+                    .put("fullName", fullName.trim())
+                    .put("username", username.trim())
+                    .put("bio", bio)
+                    .put("websiteUrl", websiteUrl.trim())
+                    .put("location", location.trim())
+                    .put("avatarUrl", avatarUrl.trim()))
+            }
+            mutable.value = mutable.value.copy(
+                accountProfile = result.accountProfile(fallback),
+                message = "Perfil atualizado."
+            )
+            account()
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun changeEmail(email: String, password: String) = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            withContext(Dispatchers.IO) {
+                api.post("/account/email/change", JSONObject().put("email", email.trim().lowercase()).put("password", password))
+            }
+            mutable.value = mutable.value.copy(message = "Enviamos um link de confirmação. Seu e-mail atual continua ativo até a confirmação.")
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun savePrivacy(options: PrivacyOptions) = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            val result = withContext(Dispatchers.IO) {
+                api.request("PUT", "/account/privacy", JSONObject()
+                    .put("shareGameActivity", options.shareGameActivity)
+                    .put("sharePlaytime", options.shareGameActivity && options.sharePlaytime)
+                    .put("shareAchievements", options.shareAchievements))
+            }
+            mutable.value = mutable.value.copy(privacy = result.privacyOptions(), message = "Preferências de privacidade salvas.")
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun revokeSession(id: String) = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            withContext(Dispatchers.IO) { api.delete("/account/sessions/" + android.net.Uri.encode(id)) }
+            mutable.value = mutable.value.copy(message = "Dispositivo desconectado.")
+            loadAccountSettings()
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun startTwoFactorSetup() = viewModelScope.launch {
+        if (mutable.value.busy) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null, twoFactorSetupSecret = "", twoFactorSetupUri = "")
+        try {
+            val result = withContext(Dispatchers.IO) { api.post("/account/totp/setup", JSONObject()) }
+            val secret = result.optString("secret")
+            if (secret.isBlank()) throw ApiFailure(0, "INVALID_RESPONSE", "Não foi possível iniciar a verificação em duas etapas.")
+            val uri = result.optString("otpauthUrl").ifBlank {
+                result.optString("otpauth_uri").ifBlank { result.optString("provisioningUri") }
+            }
+            mutable.value = mutable.value.copy(twoFactorSetupSecret = secret, twoFactorSetupUri = uri, message = "Agora adicione a chave ao seu aplicativo autenticador.")
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
+    fun confirmTwoFactor(token: String, disable: Boolean = false) = viewModelScope.launch {
+        if (mutable.value.busy || token.isBlank()) return@launch
+        mutable.value = mutable.value.copy(busy = true, error = null)
+        try {
+            withContext(Dispatchers.IO) {
+                if (disable) api.delete("/account/totp/disable", JSONObject().put("token", token.trim()))
+                else api.post("/account/totp/enable", JSONObject().put("token", token.trim()))
+            }
+            mutable.value = mutable.value.copy(
+                accountTwoFactorEnabled = !disable,
+                twoFactorSetupSecret = "",
+                twoFactorSetupUri = "",
+                message = if (disable) "Verificação em duas etapas desativada." else "Verificação em duas etapas ativada."
+            )
+        } catch (e: Exception) { mutable.value = mutable.value.copy(error = safe(e)) }
+        finally { mutable.value = mutable.value.copy(busy = false) }
+    }
+
     fun library() = viewModelScope.launch {
         if (mutable.value.user == null) return@launch
         val list = withContext(Dispatchers.IO) { runCatching { api.get("/library").feed("items", "games", "library") }.getOrDefault(emptyList()) }
@@ -175,7 +309,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         mutable.value = mutable.value.copy(busy = true)
         try { withContext(Dispatchers.IO) { api.post("/auth/logout", JSONObject()) } } catch (_: Exception) { }
         withContext(Dispatchers.IO) { api.clearSession() }
-        mutable.value = mutable.value.copy(user = null, library = emptyList(), busy = false, twoFactor = false, message = "Você saiu da conta.")
+        mutable.value = mutable.value.copy(user = null, accountProfile = null, library = emptyList(), sessions = emptyList(), busy = false, twoFactor = false, accountTwoFactorEnabled = false, twoFactorSetupSecret = "", twoFactorSetupUri = "", message = "Você saiu da conta.")
     }
     fun dismiss() { mutable.value = mutable.value.copy(message = null, error = null) }
     private fun safe(e: Exception): String {
