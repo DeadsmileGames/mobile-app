@@ -73,7 +73,7 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
-    HOME("Início"), NEWS("Notícias"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
+    HOME("Início"), GAMES("Jogos"), NEWS("Notícias"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
     ACCOUNT("Conta"), SETTINGS("Configurações"), DETAILS("Detalhes")
 }
 
@@ -207,8 +207,12 @@ private fun DeadsmileRoot(
                     state = state, pad = pad,
                     news = { page = Page.NEWS }, videos = { page = Page.VIDEOS },
                     openGame = { item -> detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS },
-                    openStory = { item -> detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS }
+                    openStory = { item -> detailItem = item; detailIsGame = false; returnPage = page; page = Page.DETAILS },
+                    openCatalog = { page = Page.GAMES }
                 )
+                Page.GAMES -> FeedScreen("Catálogo de jogos", state.games, state.loading, pad) { item ->
+                    detailItem = item; detailIsGame = true; returnPage = page; page = Page.DETAILS
+                }
                 Page.NEWS -> FeedScreen("Últimas notícias", state.news, state.loading, pad) {
                     detailItem = it; detailIsGame = false; returnPage = page; page = Page.DETAILS
                 }
@@ -236,7 +240,7 @@ private fun DeadsmileRoot(
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
                         onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
                     )
-                } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {})
+                } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
             }
         }
     }
@@ -269,7 +273,7 @@ private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boo
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 destinations.forEach { (target, icon, label) ->
-                    val active = page == target
+                    val active = (if (page == Page.GAMES) Page.HOME else page) == target
                     Surface(
                         onClick = { onSelect(target) },
                         shape = RoundedCornerShape(26.dp),
@@ -302,7 +306,8 @@ private fun Home(
     news: () -> Unit,
     videos: () -> Unit,
     openGame: (FeedItem) -> Unit,
-    openStory: (FeedItem) -> Unit
+    openStory: (FeedItem) -> Unit,
+    openCatalog: () -> Unit
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
@@ -331,7 +336,7 @@ private fun Home(
                 }
             }
         }
-        item { Section("Jogos", if (state.games.isEmpty()) "" else "Ver todos", {}) }
+        item { Section("Jogos", if (state.games.isEmpty()) "" else "Ver catálogo", openCatalog) }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
         else if (state.games.isEmpty()) item { Empty("O catálogo não está disponível agora. Tente atualizar em alguns instantes.") }
         else item {
