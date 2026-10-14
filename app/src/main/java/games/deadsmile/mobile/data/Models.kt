@@ -66,6 +66,10 @@ private fun JSONObject.firstText(vararg names: String): String {
 fun resolveAssetUrl(value: String?): String? {
     val raw = value?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
     if (raw.startsWith("//") || raw.any { it.isISOControl() } || raw.contains('\\')) return null
+    if (raw.startsWith("data:image/", ignoreCase = true)) {
+        val validDataImage = Regex("^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$", RegexOption.IGNORE_CASE)
+        return raw.takeIf { it.length <= 500_000 && validDataImage.matches(it) }
+    }
     if (raw.startsWith("https://", ignoreCase = true)) {
         val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return null
         return raw.takeIf { uri.scheme.equals("https", true) && !uri.host.isNullOrBlank() && uri.userInfo.isNullOrEmpty() }
