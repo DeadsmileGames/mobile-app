@@ -1487,7 +1487,8 @@ private fun SettingsScreen(
     dynamicColors: Boolean,
     onDynamicColors: (Boolean) -> Unit,
     reduceMotion: Boolean,
-    onReduceMotion: (Boolean) -> Unit
+    onReduceMotion: (Boolean) -> Unit,
+    onOpenUpdates: () -> Unit
 ) {
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -1548,6 +1549,15 @@ private fun SettingsScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Sobre", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Text("Deadsmile Games Companion for Android", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        item {
+            Card(shape = RoundedCornerShape(22.dp)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Atualizações", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Consulte o histórico de versões e os APKs publicados no GitHub.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onOpenUpdates, modifier = Modifier.fillMaxWidth()) { Text("Ver histórico de atualizações") }
                 }
             }
         }
