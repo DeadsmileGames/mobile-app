@@ -612,6 +612,7 @@ private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit
 
 @Composable
 
+@Composable
 private fun Home(
     state: UiState,
     pad: PaddingValues,
@@ -621,74 +622,35 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
-    val heroImage = state.games.firstOrNull { it.featured && !it.image.isNullOrBlank() }?.image
-        ?: state.games.firstOrNull { !it.image.isNullOrBlank() }?.image
-        ?: ReferenceArtwork
-    LazyColumn(
-        Modifier.fillMaxSize().padding(pad),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
+    LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
-            Box(Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 430.dp).clip(RoundedCornerShape(28.dp)).background(BrandInk)) {
-                SubcomposeAsyncImage(model = heroImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
-                    if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
-                        Box(Modifier.fillMaxSize().background(BrandInk), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(52.dp), tint = Color.White.copy(alpha = 0.35f))
-                        }
-                    } else SubcomposeAsyncImageContent()
-                }
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0x22090810), Color(0xC9090810), Color(0xF5090810)))))
-                Column(Modifier.align(Alignment.BottomStart).padding(22.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                    Surface(color = BrandViolet.copy(alpha = 0.95f), shape = RoundedCornerShape(8.dp)) {
-                        Text("DEADSMILE GAMES COMPANION", Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Catálogo oficial, notícias, vídeos e biblioteca da sua conta para PC.", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.88f))
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        if (maxWidth < 400.dp) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth()) {
-                                    Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos")
-                                }
-                                OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
-                                    Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias")
-                                }
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Button(onClick = openCatalog) { Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos") }
-                                OutlinedButton(onClick = news, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
-                                    Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias")
-                                }
-                            }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+                item(key = "companion-welcome") {
+                    Card(Modifier.width(320.dp).height(300.dp), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                        Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Catálogo de jogos, newswire, vídeos e biblioteca para PC.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.weight(1f))
+                            Button(onClick = openCatalog, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Explorar jogos") }
+                            OutlinedButton(onClick = news, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Newswire") }
                         }
                     }
                 }
+                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes") { openGame(game) } }
             }
         }
-        item { Section("Jogos", if (state.games.isEmpty()) "" else "Ver catálogo", openCatalog) }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
         else if (state.games.isEmpty()) item { Empty("O catálogo não está disponível agora. Tente atualizar em alguns instantes.") }
-        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-            items(state.games, key = { it.id }) { game -> FeedCard(game, Modifier.width(238.dp), "Detalhes") { openGame(game) } }
-        } }
         item { Section("Notícias", if (state.news.isEmpty()) "" else "Ver todas", news) }
         if (state.loading && state.news.isEmpty()) item { LoadingRow() }
         else if (state.news.isEmpty()) item { Empty("Nenhuma notícia nova por enquanto.") }
-        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-            items(state.news.take(8), key = { it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } }
-        } }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.news.take(8), key = { "home-news-" + it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } } } }
         item { Section("Vídeos", if (state.videos.isEmpty()) "" else "Ver todos", videos) }
         if (state.loading && state.videos.isEmpty()) item { LoadingRow() }
         else if (state.videos.isEmpty()) item { Empty("Novos vídeos aparecerão aqui quando estiverem disponíveis.") }
-        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
-            items(state.videos.take(8), key = { it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") { openStory(video) } }
-        } }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) { items(state.videos.take(8), key = { "home-video-" + it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") { openStory(video) } } } }
     }
 }
-
 @Composable
 private fun Section(title: String, action: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
