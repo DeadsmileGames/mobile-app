@@ -74,7 +74,7 @@ fun UpdatesScreen(
                 Modifier.fillMaxWidth().padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                Text("Deadsmile Games Companion", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Deadsmile Games", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     "Versão instalada: $installedVersion",
                     style = MaterialTheme.typography.bodyMedium,
