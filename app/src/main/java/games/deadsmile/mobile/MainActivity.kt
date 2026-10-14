@@ -801,7 +801,6 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
     }
 }
 
-@Composable
 private const val ABBY_OFFICIAL_ARTWORK = "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
 
 @Composable
@@ -834,6 +833,7 @@ private fun GameArtwork(item: FeedItem, modifier: Modifier = Modifier, contentSc
     }
 }
 
+@Composable
 private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
