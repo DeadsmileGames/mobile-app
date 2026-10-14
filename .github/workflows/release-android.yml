@@ -1,4 +1,4 @@
-name: Release Android
+name: Release Android APK
 
 on:
   push:
@@ -10,13 +10,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-release-${{ github.ref }}
+  group: android-apk-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  signed-release:
+  direct-apk:
     if: github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.0'))
-    name: Build and publish Android release assets
+    name: Build and publish direct-install APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -34,32 +34,23 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Verify UI contracts and release version
-        env:
-          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
-          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+      - name: Verify source and release version
         run: |
           set -euo pipefail
           python3 scripts/verify_companion_design.py
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            TAG="${GITHUB_REF_NAME}"
+            TAG="$GITHUB_REF_NAME"
           else
             TAG="v1.1.0"
           fi
           VERSION="${TAG#v}"
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Use a semantic version tag such as v1.1.0."
-            exit 1
-          fi
-          if [[ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" || -z "$ANDROID_RELEASE_STORE_PASSWORD" || -z "$ANDROID_RELEASE_KEY_ALIAS" || -z "$ANDROID_RELEASE_KEY_PASSWORD" ]]; then
-            echo "::error::Configure ANDROID_RELEASE_KEYSTORE_BASE64, ANDROID_RELEASE_STORE_PASSWORD, ANDROID_RELEASE_KEY_ALIAS, and ANDROID_RELEASE_KEY_PASSWORD in GitHub Actions secrets."
+            echo "::error::Use a version tag such as v1.1.0."
             exit 1
           fi
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
           if (( MAJOR > 2000 || MINOR > 999 || PATCH > 999 )); then
-            echo "::error::Version components must be MAJOR <= 2000 and MINOR/PATCH <= 999."
+            echo "::error::Version components are out of range."
             exit 1
           fi
           VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
@@ -71,91 +62,50 @@ jobs:
           grep -F 'targetSdk = 36' app/build.gradle.kts
           printf 'APP_VERSION_NAME=%s\n' "$VERSION" >> "$GITHUB_ENV"
           printf 'APP_VERSION_CODE=%s\n' "$VERSION_CODE" >> "$GITHUB_ENV"
-          KEYSTORE_PATH="$RUNNER_TEMP/deadsmile-release.jks"
-          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          test -s "$KEYSTORE_PATH"
-          printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
-      - name: Run unit tests for both distribution flavors
+      - name: Run unit tests
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
 
-      - name: Build signed direct APK and Google Play bundle
-        env:
-          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
-          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+      - name: Build direct-install APK
         run: |
           set -euo pipefail
-          gradle --no-daemon --stacktrace assembleDirectRelease assemblePlayRelease bundlePlayRelease \
+          gradle --no-daemon --stacktrace assembleDirectRelease \
             -PappVersionName="$APP_VERSION_NAME" \
             -PappVersionCode="$APP_VERSION_CODE"
 
-          DIRECT_APK="app/build/outputs/apk/direct/release/app-direct-release.apk"
-          PLAY_APK="app/build/outputs/apk/play/release/app-play-release.apk"
-          PLAY_AAB="app/build/outputs/bundle/playRelease/app-play-release.aab"
-          test -s "$DIRECT_APK"
-          test -s "$PLAY_APK"
-          test -s "$PLAY_AAB"
+          APK="app/build/outputs/apk/direct/release/app-direct-release.apk"
+          test -s "$APK"
 
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
           test -x "$AAPT"
+          "$APKSIGNER" verify --verbose "$APK"
+          "$APKSIGNER" verify --print-certs "$APK"
 
-          "$APKSIGNER" verify --verbose "$DIRECT_APK"
-          "$APKSIGNER" verify --verbose "$PLAY_APK"
-          jarsigner -verify -certs "$PLAY_AAB"
-          unzip -tq "$PLAY_AAB"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
+          printf '%s\n' "$BADGING" | grep -F "application-label:'Deadsmile Games'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
+          printf '%s\n' "$("$AAPT" dump permissions "$APK")" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"
 
-          DIRECT_BADGING="$("$AAPT" dump badging "$DIRECT_APK")"
-          PLAY_BADGING="$("$AAPT" dump badging "$PLAY_APK")"
-          for BADGING in "$DIRECT_BADGING" "$PLAY_BADGING"; do
-            printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
-            printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
-          done
+          cp "$APK" "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk"
+          sha256sum "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk"
+          printf 'APK_ASSET=%s\n' "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" >> "$GITHUB_ENV"
 
-          printf '%s\n' "$("$AAPT" dump permissions "$DIRECT_APK")" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"
-          if printf '%s\n' "$("$AAPT" dump permissions "$PLAY_APK")" | grep -Fq "android.permission.REQUEST_INSTALL_PACKAGES"; then
-            echo "::error::The Google Play build must not request REQUEST_INSTALL_PACKAGES."
-            exit 1
-          fi
-
-          DIRECT_CERT="$("$APKSIGNER" verify --print-certs "$DIRECT_APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/{gsub(":","",$2); print tolower($2); exit}')"
-          PLAY_CERT="$(keytool -printcert -jarfile "$PLAY_AAB" | awk '/SHA256:/{gsub(/[ :]/,"",$2); print tolower($2); exit}')"
-          if [[ -z "$DIRECT_CERT" || -z "$PLAY_CERT" || "$DIRECT_CERT" != "$PLAY_CERT" ]]; then
-            echo "::error::The APK and AAB must be signed with the same upload keystore."
-            exit 1
-          fi
-
-          cp "$DIRECT_APK" "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk"
-          cp "$PLAY_AAB" "$RUNNER_TEMP/Deadsmile-Games-Play-Store-v$APP_VERSION_NAME.aab"
-          (
-            cd "$RUNNER_TEMP"
-            sha256sum "Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" "Deadsmile-Games-Play-Store-v$APP_VERSION_NAME.aab" > SHA256SUMS.txt
-          )
-          printf 'DIRECT_APK_ASSET=%s\n' "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" >> "$GITHUB_ENV"
-          printf 'PLAY_AAB_ASSET=%s\n' "$RUNNER_TEMP/Deadsmile-Games-Play-Store-v$APP_VERSION_NAME.aab" >> "$GITHUB_ENV"
-          printf 'CHECKSUMS_ASSET=%s\n' "$RUNNER_TEMP/SHA256SUMS.txt" >> "$GITHUB_ENV"
-
-      - name: Publish GitHub Release
+      - name: Publish APK release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            TAG="${GITHUB_REF_NAME}"
+            TAG="$GITHUB_REF_NAME"
           else
             TAG="v1.1.0"
           fi
           gh release create "$TAG" --target "$GITHUB_SHA" \
-            "$DIRECT_APK_ASSET#Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" \
-            "$PLAY_AAB_ASSET#Deadsmile-Games-Play-Store-v$APP_VERSION_NAME.aab" \
-            "$CHECKSUMS_ASSET#SHA256SUMS.txt" \
-            --title "Deadsmile Games Android $APP_VERSION_NAME" \
-            --notes "Production Android release for com.deadsmilegames.companion.
+            "$APK_ASSET#Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" \
+            --title "Deadsmile Games $APP_VERSION_NAME" \
+            --notes "APK for direct installation on Android.
 
-          - Signed APK: direct installation outside Google Play.
-          - Signed Android App Bundle (AAB): upload this file to Google Play Console.
-          - The Google Play build omits REQUEST_INSTALL_PACKAGES; updates to that variant are delivered by Google Play.
-          - targetSdkVersion: Android 16 (API 36).
-          - SHA256SUMS.txt contains asset checksums."
+          Signed with the Android development key, not a Google Play app-signing certificate. This is a direct-download APK; it is not a Google Play Store release. Android updates require a matching signing certificate."
