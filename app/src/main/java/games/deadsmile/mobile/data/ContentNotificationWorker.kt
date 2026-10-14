@@ -77,9 +77,10 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         var cursor = if (establishBaseline) 0L else savedCursor
         val newEvents = mutableListOf<JSONObject>()
         try {
-            repeat(10) {
+            for (page in 0 until 10) {
                 val data = api.get("/platform/events?after=" + cursor + "&limit=100")
-                val items = data.optJSONArray("items") ?: return@repeat
+                val items = data.optJSONArray("items") ?: break
+                val before = cursor
                 for (i in 0 until items.length()) {
                     val event = items.optJSONObject(i) ?: continue
                     val id = event.optLong("id", -1L)
@@ -87,7 +88,7 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
                     cursor = id
                     newEvents.add(JSONObject(event.toString()))
                 }
-                if (items.length() < 100) return@repeat
+                if (items.length() < 100 || cursor == before) break
             }
             preferences.edit().putLong("notification_event_cursor", cursor).apply()
             if (establishBaseline) return
