@@ -24,6 +24,8 @@ data class FeedItem(
     val genres: List<String> = emptyList(),
     val screenshots: List<String> = emptyList(),
     val relatedGames: List<FeedItem> = emptyList(),
+    val associatedGameIds: List<String> = emptyList(),
+    val associatedGameSlugs: List<String> = emptyList(),
     val status: String = "",
     val releaseDate: String = "",
     val accessType: String = "",
@@ -191,15 +193,47 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
             resolveAssetUrl(raw)?.let(::add)
         }
     } + htmlImageUrls(rawBody)).distinct()
-    val relatedArray = if (includeRelated) {
-        o.optJSONArray("relatedGames") ?: o.optJSONArray("related_games") ?: o.optJSONArray("related") ?: o.optJSONArray("recommendations")
-    } else null
-    val related = buildList {
-        if (relatedArray != null) for (i in 0 until relatedArray.length()) {
-            val entry = relatedArray.optJSONObject(i) ?: continue
-            add(itemFromJson(entry, "related-" + i, false))
+    val relatedArrays = if (includeRelated) listOfNotNull(
+        o.optJSONArray("relatedGames"), o.optJSONArray("related_games"),
+        o.optJSONArray("associatedGames"), o.optJSONArray("associated_games"),
+        o.optJSONArray("related"), o.optJSONArray("recommendations"), o.optJSONArray("games")
+    ) else emptyList()
+    val directRelatedObjects = if (includeRelated) listOfNotNull(
+        o.optJSONObject("relatedGame"), o.optJSONObject("related_game"),
+        o.optJSONObject("associatedGame"), o.optJSONObject("associated_game"),
+        o.optJSONObject("linkedGame"), o.optJSONObject("linked_game"),
+        o.optJSONObject("game")
+    ) else emptyList()
+    val relatedObjects = buildList {
+        relatedArrays.forEach { array ->
+            for (i in 0 until array.length()) array.optJSONObject(i)?.let(::add)
         }
+        directRelatedObjects.forEach(::add)
+    }.distinctBy { it.firstText("id", "uuid", "slug", "gameId", "game_id").ifBlank { it.firstText("title", "name") } }
+    val related = relatedObjects.mapNotNull { entry ->
+        if (entry.firstText("title", "name", "gameTitle", "game_title").isBlank()) null
+        else itemFromJson(entry, "related-game", false)
     }
+    val associatedIds = buildSet {
+        listOf("gameId", "game_id", "associatedGameId", "associated_game_id", "relatedGameId", "related_game_id")
+            .map { o.firstText(it) }.filter { it.isNotBlank() }.forEach(::add)
+        listOf("gameIds", "game_ids", "associatedGameIds", "associated_game_ids", "relatedGameIds", "related_game_ids").forEach { key ->
+            o.optJSONArray(key)?.let { array ->
+                for (i in 0 until array.length()) {
+                    when (val entry = array.opt(i)) {
+                        is String -> entry.takeIf { it.isNotBlank() }?.let(::add)
+                        is JSONObject -> entry.firstText("id", "uuid", "gameId", "game_id").takeIf { it.isNotBlank() }?.let(::add)
+                    }
+                }
+            }
+        }
+        relatedObjects.forEach { entry -> entry.firstText("id", "uuid", "gameId", "game_id").takeIf { it.isNotBlank() }?.let(::add) }
+    }.toList()
+    val associatedSlugs = buildSet {
+        listOf("gameSlug", "game_slug", "associatedGameSlug", "associated_game_slug", "relatedGameSlug", "related_game_slug")
+            .map { o.firstText(it) }.filter { it.isNotBlank() }.forEach(::add)
+        relatedObjects.forEach { entry -> entry.firstText("slug", "gameSlug", "game_slug").takeIf { it.isNotBlank() }?.let(::add) }
+    }.toList()
     return FeedItem(
         id = id,
         title = title,
@@ -215,6 +249,8 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         genres = genres,
         screenshots = screenshots,
         relatedGames = related,
+        associatedGameIds = associatedIds,
+        associatedGameSlugs = associatedSlugs,
         status = o.firstText("status", "gameStatus", "game_status").lowercase(),
         releaseDate = o.firstText("releaseDate", "release_date"),
         accessType = o.firstText("accessType", "access_type"),
@@ -283,7 +319,9 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         publishedAt = parsed.publishedAt.ifBlank { fallback.publishedAt },
         genres = parsed.genres.ifEmpty { fallback.genres },
         screenshots = parsed.screenshots.ifEmpty { fallback.screenshots },
-        relatedGames = parsed.relatedGames.ifEmpty { rootRelated.ifEmpty { fallback.relatedGames } },
+        relatedGames = (parsed.relatedGames + rootRelated + fallback.relatedGames).distinctBy { it.id },
+        associatedGameIds = (parsed.associatedGameIds + fallback.associatedGameIds).distinct(),
+        associatedGameSlugs = (parsed.associatedGameSlugs + fallback.associatedGameSlugs).distinct(),
         status = parsed.status.ifBlank { fallback.status },
         releaseDate = parsed.releaseDate.ifBlank { fallback.releaseDate },
         accessType = parsed.accessType.ifBlank { fallback.accessType },
