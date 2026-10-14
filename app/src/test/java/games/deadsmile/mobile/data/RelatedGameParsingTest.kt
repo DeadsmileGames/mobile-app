@@ -14,12 +14,10 @@ class RelatedGameParsingTest {
                 "id": "news-7",
                 "slug": "patch-notes",
                 "title": "Patch Notes",
-                "summary": "An update for the game.",
                 "game": {
                   "id": "game-42",
                   "slug": "starfall",
-                  "title": "Starfall",
-                  "coverImage": "https://example.com/starfall.jpg"
+                  "title": "Starfall"
                 }
               }
             }
@@ -47,7 +45,7 @@ class RelatedGameParsingTest {
         val payload = JSONObject(
             """
             {
-              "article": {"id":"news-8","slug":"release","title":"Release announcement","body":"Article body"},
+              "article": {"id":"news-8","slug":"release","title":"Release announcement"},
               "game": {"id":"game-8","slug":"release-game","title":"Associated Game"}
             }
             """.trimIndent()
