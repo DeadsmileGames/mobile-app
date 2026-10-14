@@ -135,7 +135,7 @@ RELEASE_CHECKS = [
     ("launcher label is the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS),
     ("English launcher label matches the public app name", '<string name="app_name">Deadsmile Games</string>' in STRINGS_EN),
     ("CI smoke-builds the direct release APK", "assembleDirectRelease" in ANDROID_WORKFLOW and "bundlePlayRelease" not in ANDROID_WORKFLOW),
-    ("CI verifies the direct APK package and permissions", "REQUEST_INSTALL_PACKAGES" in ANDROID_WORKFLOW and "apksigner verify" in ANDROID_WORKFLOW),
+    ("CI verifies the direct APK package and permissions", "REQUEST_INSTALL_PACKAGES" in ANDROID_WORKFLOW and "verify --verbose" in ANDROID_WORKFLOW),
     ("release workflow builds only the direct APK", "assembleDirectRelease" in RELEASE_WORKFLOW and "bundlePlayRelease" not in RELEASE_WORKFLOW and ".aab" not in RELEASE_WORKFLOW),
     ("release workflow validates package and target API", "com.deadsmilegames.companion" in RELEASE_WORKFLOW and "targetSdkVersion:'36'" in RELEASE_WORKFLOW),
     ("direct release uses Android debug signing without a private key", 'signingConfigs.getByName("debug")' in GRADLE and "ANDROID_RELEASE_KEYSTORE_BASE64" not in RELEASE_WORKFLOW),
