@@ -1,3 +1,9 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
+
 val releaseKeystorePath = providers.gradleProperty("releaseKeystorePath").orNull ?: System.getenv("ANDROID_RELEASE_KEYSTORE_PATH")
 val releaseStorePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD")
 val releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS")
@@ -7,11 +13,6 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
     !releaseKeyAlias.isNullOrBlank() &&
     !releaseKeyPassword.isNullOrBlank()
 
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-}
 android {
     namespace = "games.deadsmile.mobile"
     compileSdk = 35
