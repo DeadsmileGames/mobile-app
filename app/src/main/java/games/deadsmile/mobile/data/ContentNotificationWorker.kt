@@ -53,8 +53,8 @@ class ContentNotificationWorker(appContext: Context, params: WorkerParameters) :
         var failures = 0
         for (stream in streams) {
             val items = runCatching { stream.load().distinctBy { it.id } }
-                .onFailure { failures++ }.getOrNull().orEmpty()
-            if (items.isEmpty()) continue
+                .onFailure { failures++ }.getOrNull() ?: continue
+            // A successful empty response is still a valid baseline. This lets the first future item notify.
             succeeded++
             val key = "notification_seen_ids_" + stream.key
             val previous = preferences.getString(key, null)
