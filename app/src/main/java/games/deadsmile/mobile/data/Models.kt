@@ -23,7 +23,17 @@ data class FeedItem(
     val publisher: String = "",
     val genres: List<String> = emptyList(),
     val screenshots: List<String> = emptyList(),
-    val relatedGames: List<FeedItem> = emptyList()
+    val relatedGames: List<FeedItem> = emptyList(),
+    val status: String = "",
+    val releaseDate: String = "",
+    val accessType: String = "free",
+    val purchaseUrl: String? = null,
+    val itchUrl: String? = null,
+    val microsoftStoreUrl: String? = null,
+    val downloadAvailable: Boolean = false,
+    val launcherAvailable: Boolean = false,
+    val featured: Boolean = false,
+    val platforms: List<String> = emptyList()
 )
 
 data class UserAccount(val id: String, val username: String, val email: String, val bio: String)
@@ -125,6 +135,11 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
     )).ifBlank { displayHtml(rawBody).take(220) }
     val url = o.firstText("video_url", "videoUrl", "externalUrl", "external_url", "url")
         .takeIf { it.startsWith("https://", ignoreCase = true) }
+    val purchaseUrl = o.firstText("purchaseUrl", "purchase_url").takeIf { it.startsWith("https://", ignoreCase = true) }
+    val itchUrl = o.firstText("itchUrl", "itch_url").takeIf { it.startsWith("https://", ignoreCase = true) }
+    val microsoftStoreUrl = o.optJSONObject("microsoftStore")?.let { store ->
+        store.firstText("storeUrl", "productUrl", "url").takeIf { it.startsWith("https://", ignoreCase = true) }
+    }
     val genres = (o.optJSONArray("genres") ?: o.optJSONArray("tags") ?: JSONArray()).strings()
     val screenArray = o.optJSONArray("screenshots") ?: o.optJSONArray("gallery") ?: JSONArray()
     val screenshots = (buildList {
@@ -161,7 +176,17 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         publisher = o.firstText("publisher", "distributor"),
         genres = genres,
         screenshots = screenshots,
-        relatedGames = related
+        relatedGames = related,
+        status = o.firstText("status", "gameStatus", "game_status").lowercase(),
+        releaseDate = o.firstText("releaseDate", "release_date"),
+        accessType = o.firstText("accessType", "access_type").ifBlank { "free" },
+        purchaseUrl = purchaseUrl,
+        itchUrl = itchUrl,
+        microsoftStoreUrl = microsoftStoreUrl,
+        downloadAvailable = o.optBoolean("downloadAvailable", false),
+        launcherAvailable = o.optBoolean("launcherAvailable", o.optBoolean("downloadAvailable", false)),
+        featured = o.optBoolean("featured", false),
+        platforms = (o.optJSONArray("platforms") ?: JSONArray()).strings()
     )
 }
 
@@ -200,7 +225,17 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         publishedAt = parsed.publishedAt.ifBlank { fallback.publishedAt },
         genres = parsed.genres.ifEmpty { fallback.genres },
         screenshots = parsed.screenshots.ifEmpty { fallback.screenshots },
-        relatedGames = parsed.relatedGames.ifEmpty { rootRelated.ifEmpty { fallback.relatedGames } }
+        relatedGames = parsed.relatedGames.ifEmpty { rootRelated.ifEmpty { fallback.relatedGames } },
+        status = parsed.status.ifBlank { fallback.status },
+        releaseDate = parsed.releaseDate.ifBlank { fallback.releaseDate },
+        accessType = parsed.accessType.ifBlank { fallback.accessType },
+        purchaseUrl = parsed.purchaseUrl ?: fallback.purchaseUrl,
+        itchUrl = parsed.itchUrl ?: fallback.itchUrl,
+        microsoftStoreUrl = parsed.microsoftStoreUrl ?: fallback.microsoftStoreUrl,
+        downloadAvailable = parsed.downloadAvailable || fallback.downloadAvailable,
+        launcherAvailable = parsed.launcherAvailable || fallback.launcherAvailable,
+        featured = parsed.featured || fallback.featured,
+        platforms = parsed.platforms.ifEmpty { fallback.platforms }
     )
 }
 

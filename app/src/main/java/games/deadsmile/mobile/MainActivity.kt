@@ -93,6 +93,7 @@ private enum class Page(val label: String) {
 private val BrandInk = Color(0xFF111019)
 private val BrandViolet = Color(0xFF8173FF)
 private val BrandRose = Color(0xFFFF647C)
+private const val ReferenceArtwork = "https://cdn2.unrealengine.com/egs-1920x1080-faee3c527bb1.jpg"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -107,13 +108,18 @@ class MainActivity : ComponentActivity() {
 private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE) }
+    LaunchedEffect(Unit) {
+        val permissionGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (prefs.getBoolean("notifications_enabled", false) && permissionGranted) scheduleContentNotifications(context)
+    }
     var themeMode by rememberSaveable { mutableIntStateOf(prefs.getInt("theme_mode", 0)) }
     var dynamicColors by rememberSaveable { mutableStateOf(prefs.getBoolean("dynamic_colors", true)) }
     var accentPalette by rememberSaveable { mutableIntStateOf(prefs.getInt("accent_palette", 0).coerceIn(0, 3)) }
     var reduceMotion by rememberSaveable { mutableStateOf(prefs.getBoolean("reduce_motion", false)) }
     val systemDark = isSystemInDarkTheme()
-    val dark = when (themeMode) { 1 -> false; 2 -> true; else -> systemDark }
+    val dark = when (themeMode) { 1 -> false; 2, 3 -> true; else -> systemDark }
     val scheme = when {
+        themeMode == 3 -> darkColorScheme(primary = Color(0xFFB8AEFF), secondary = Color(0xFFFF9DB0), tertiary = Color(0xFF91D9D0), background = Color.Black, surface = Color.Black, surfaceVariant = Color(0xFF0C0C10), surfaceContainerLow = Color(0xFF050507), surfaceContainer = Color(0xFF09090C), surfaceContainerHigh = Color(0xFF101014), surfaceContainerHighest = Color(0xFF17171C), outlineVariant = Color(0xFF34343A))
         Build.VERSION.SDK_INT >= 31 && dynamicColors && dark -> dynamicDarkColorScheme(context)
         Build.VERSION.SDK_INT >= 31 && dynamicColors -> dynamicLightColorScheme(context)
         dark -> darkColorScheme(
@@ -132,7 +138,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
             DeadsmileRoot(
                 vm = vm,
                 themeMode = themeMode,
-                onThemeMode = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
+                onThemeMode = { themeMode = it; if (it == 3) { dynamicColors = false; prefs.edit().putBoolean("dynamic_colors", false).apply() }; prefs.edit().putInt("theme_mode", it).apply() },
                 dynamicColors = dynamicColors,
                 onDynamicColors = { dynamicColors = it; prefs.edit().putBoolean("dynamic_colors", it).apply() },
                 accentPalette = accentPalette,
@@ -187,10 +193,10 @@ private fun DeadsmileRoot(
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("Deadsmile", fontWeight = FontWeight.Bold)
+                        Text("Deadsmile Games Companion", fontWeight = FontWeight.Bold)
                         Text(
                             when (page) {
-                                Page.HOME -> "Jogos, notícias e novidades"
+                                Page.HOME -> "Catálogo, notícias e biblioteca de PC"
                                 Page.DETAILS -> "Detalhes do jogo"
                                 else -> page.label
                             },
@@ -346,6 +352,7 @@ private fun FloatingDock(page: Page, onSelect: (Page) -> Unit, reduceMotion: Boo
 }
 
 @Composable
+
 private fun Home(
     state: UiState,
     pad: PaddingValues,
@@ -355,29 +362,25 @@ private fun Home(
     openStory: (FeedItem) -> Unit,
     openCatalog: () -> Unit
 ) {
+    val heroImage = state.games.firstOrNull { !it.image.isNullOrBlank() }?.image ?: ReferenceArtwork
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Card(
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f)),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                        Text("DEADSMILE GAMES", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Box(Modifier.fillMaxWidth().heightIn(min = 280.dp, max = 340.dp).clip(RoundedCornerShape(28.dp)).background(BrandInk)) {
+                AsyncImage(model = heroImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0x22090810), Color(0xC9090810), Color(0xF5090810)))))
+                Column(Modifier.align(Alignment.BottomStart).padding(22.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Surface(color = BrandViolet.copy(alpha = 0.95f), shape = RoundedCornerShape(8.dp)) {
+                        Text("DEADSMILE GAMES COMPANION", Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
                     }
-                    Text("Seu próximo jogo começa aqui.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Descubra lançamentos, acompanhe novidades e consulte sua biblioteca do PC.", color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        FilledTonalButton(onClick = news) { Icon(Icons.Default.Article, null); Spacer(Modifier.width(6.dp)); Text("Novidades") }
-                        OutlinedButton(onClick = videos) { Icon(Icons.Default.Videocam, null); Spacer(Modifier.width(6.dp)); Text("Vídeos") }
+                    Text("Deadsmile Games Companion", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Catálogo oficial, notícias, vídeos e biblioteca da sua conta para PC.", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.88f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = openCatalog) { Icon(Icons.Default.VideogameAsset, null); Spacer(Modifier.width(7.dp)); Text("Explorar jogos") }
+                        OutlinedButton(onClick = news, colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Icon(Icons.Default.Article, null); Spacer(Modifier.width(7.dp)); Text("Últimas notícias") }
                     }
                 }
             }
@@ -385,29 +388,21 @@ private fun Home(
         item { Section("Jogos", if (state.games.isEmpty()) "" else "Ver catálogo", openCatalog) }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
         else if (state.games.isEmpty()) item { Empty("O catálogo não está disponível agora. Tente atualizar em alguns instantes.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.games, key = { it.id }) { game -> FeedCard(game, Modifier.width(230.dp), "Detalhes") { openGame(game) } }
-            }
-        }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+            items(state.games, key = { it.id }) { game -> FeedCard(game, Modifier.width(238.dp), "Detalhes") { openGame(game) } }
+        } }
         item { Section("Notícias", if (state.news.isEmpty()) "" else "Ver todas", news) }
         if (state.loading && state.news.isEmpty()) item { LoadingRow() }
         else if (state.news.isEmpty()) item { Empty("Nenhuma notícia nova por enquanto.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.news.take(8), key = { it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } }
-            }
-        }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+            items(state.news.take(8), key = { it.id }) { story -> FeedCard(story, Modifier.width(280.dp)) { openStory(story) } }
+        } }
         item { Section("Vídeos", if (state.videos.isEmpty()) "" else "Ver todos", videos) }
         if (state.loading && state.videos.isEmpty()) item { LoadingRow() }
         else if (state.videos.isEmpty()) item { Empty("Novos vídeos aparecerão aqui quando estiverem disponíveis.") }
-        else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.videos.take(8), key = { it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") {
-                    if (video.url != null) openStory(video) else openStory(video)
-                } }
-            }
-        }
+        else item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
+            items(state.videos.take(8), key = { it.id }) { video -> FeedCard(video, Modifier.width(250.dp), "Assistir") { openStory(video) } }
+        } }
     }
 }
 
@@ -479,7 +474,7 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
     ) {
         Column {
             if (item.image != null) {
-                AsyncImage(item.image, item.title, Modifier.fillMaxWidth().height(155.dp), contentScale = ContentScale.Crop)
+                Box(Modifier.fillMaxWidth().height(155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) { AsyncImage(item.image, item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
             } else {
                 Box(
                     Modifier.fillMaxWidth().height(112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
@@ -487,6 +482,8 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
                 ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
+                if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
                 if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
@@ -967,7 +964,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                 state.news.flatMap { it.screenshots } + state.news.mapNotNull { it.image } +
                 state.videos.flatMap { it.screenshots } + state.videos.mapNotNull { it.image }
             ).distinct().take(18)
-            .ifEmpty { listOf("https://raw.githubusercontent.com/deadsmilegames/launcher/main/winui/src/Deadsmile.Launcher/Assets/LargeTile.png") }
+            .ifEmpty { listOf(ReferenceArtwork) }
     }
     var imageIndex by remember(images) { mutableIntStateOf(0) }
     LaunchedEffect(images) {
@@ -1002,8 +999,8 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                     Icon(Icons.Default.VideogameAsset, null, Modifier.size(27.dp), tint = Color.White)
                 }
                 Column {
-                    Text("DEADSMILE GAMES", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Seu universo de jogos", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
+                    Text("DEADSMILE GAMES COMPANION", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Catálogo, conta e novidades da plataforma", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.78f))
                 }
             }
             Spacer(Modifier.height(22.dp))
@@ -1069,7 +1066,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("Notícias e jogos em um só lugar.", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
+            Text("Catálogo, notícias e conta conectados à plataforma Deadsmile.", color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -1164,7 +1161,7 @@ private fun SettingsScreen(
             Card(shape = RoundedCornerShape(22.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Aparência", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    listOf("Seguir o sistema", "Claro", "Escuro").forEachIndexed { index, label ->
+                    listOf("Seguir o sistema", "Claro", "Escuro", "OLED (preto puro)").forEachIndexed { index, label ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onThemeMode(index) }.padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
