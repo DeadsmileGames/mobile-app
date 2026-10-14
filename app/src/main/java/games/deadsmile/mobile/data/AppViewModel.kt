@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -23,17 +25,80 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val mutable = MutableStateFlow(UiState())
     val state = mutable.asStateFlow()
 
+    private var reloadGeneration = 0
     init { reload(); account() }
+
     fun reload() = viewModelScope.launch {
+        val generation = ++reloadGeneration
         mutable.value = mutable.value.copy(loading = true, error = null)
-        val content = withContext(Dispatchers.IO) {
-            Triple(
-                runCatching { api.get("/newswire?limit=24&offset=0").feed("items", "news") }.getOrDefault(emptyList()),
-                runCatching { api.get("/videos?limit=24&offset=0").feed("items", "videos") }.getOrDefault(emptyList()),
-                runCatching { api.get("/games?page=1&limit=48").feed("items", "games") }.getOrDefault(emptyList())
-            )
+        val initial = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val news = async { runCatching { api.get("/newswire?limit=24&offset=0") }.getOrNull() }
+                val videos = async { runCatching { api.get("/videos?limit=24&offset=0") }.getOrNull() }
+                val games = async { runCatching { api.get("/games?page=1&limit=48") }.getOrNull() }
+                Triple(news.await(), videos.await(), games.await())
+            }
         }
-        mutable.value = mutable.value.copy(news = content.first, videos = content.second, games = content.third, loading = false)
+        if (generation != reloadGeneration) return@launch
+        val initialNews = initial.first?.feed("items", "news") ?: emptyList()
+        val initialVideos = initial.second?.feed("items", "videos") ?: emptyList()
+        val initialGames = initial.third?.feed("items", "games") ?: emptyList()
+        mutable.value = mutable.value.copy(news = initialNews, videos = initialVideos, games = initialGames, loading = false)
+
+        // First-page content is visible immediately; the rest of the catalog fills in
+        // quietly in the background so the mobile UI is never held behind pagination.
+        val all = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val news = async { completeOffsetFeed(initialNews, 24) { offset ->
+                    api.get("/newswire?limit=24&offset=" + offset).feed("items", "news")
+                } }
+                val videos = async { completeOffsetFeed(initialVideos, 24) { offset ->
+                    api.get("/videos?limit=24&offset=" + offset).feed("items", "videos")
+                } }
+                val totalPages = initial.third?.optJSONObject("pagination")
+                    ?.optInt("totalPages", 1)?.coerceIn(1, 100) ?: 1
+                val games = async { completePagedGames(initialGames, totalPages) { page ->
+                    api.get("/games?page=" + page + "&limit=48").feed("items", "games")
+                } }
+                Triple(news.await(), videos.await(), games.await())
+            }
+        }
+        if (generation != reloadGeneration) return@launch
+        mutable.value = mutable.value.copy(news = all.first, videos = all.second, games = all.third)
+    }
+
+    private suspend fun completeOffsetFeed(
+        first: List<FeedItem>,
+        pageSize: Int,
+        fetch: suspend (offset: Int) -> List<FeedItem>
+    ): List<FeedItem> {
+        val collected = first.toMutableList()
+        var offset = first.size
+        var pages = 1
+        while (first.size >= pageSize && pages < 40) {
+            val page = runCatching { fetch(offset) }.getOrDefault(emptyList())
+            if (page.isEmpty()) break
+            collected.addAll(page)
+            offset += page.size
+            pages++
+            if (page.size < pageSize) break
+        }
+        return collected.distinctBy { it.id }
+    }
+
+    private suspend fun completePagedGames(
+        first: List<FeedItem>,
+        totalPages: Int,
+        fetch: suspend (page: Int) -> List<FeedItem>
+    ): List<FeedItem> {
+        if (totalPages <= 1) return first
+        val collected = first.toMutableList()
+        for (page in 2..totalPages) {
+            val batch = runCatching { fetch(page) }.getOrDefault(emptyList())
+            if (batch.isEmpty()) break
+            collected.addAll(batch)
+        }
+        return collected.distinctBy { it.id }
     }
     fun loadDetails(item: FeedItem, isGame: Boolean) = viewModelScope.launch {
         mutable.value = mutable.value.copy(detail = item, detailLoading = true)
