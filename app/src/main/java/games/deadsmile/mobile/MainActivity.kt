@@ -329,7 +329,7 @@ private fun DeadsmileRoot(
 
     LaunchedEffect(state.message, state.error) {
         (state.error ?: state.message)?.let {
-            snackbar.showSnackbar(it)
+            snackbar.showSnackbar(AppI18n.translate(context, it))
             vm.dismiss()
         }
     }
@@ -338,12 +338,12 @@ private fun DeadsmileRoot(
     }
     LaunchedEffect(tourFeedback) {
         val message = tourFeedback ?: return@LaunchedEffect
-        snackbar.showSnackbar(message)
+        snackbar.showSnackbar(AppI18n.translate(context, message))
         tourFeedback = null
     }
     LaunchedEffect(autoUpdateError) {
         val message = autoUpdateError ?: return@LaunchedEffect
-        snackbar.showSnackbar(message)
+        snackbar.showSnackbar(AppI18n.translate(context, message))
         autoUpdateError = null
     }
 
