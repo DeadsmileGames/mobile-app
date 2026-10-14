@@ -26,7 +26,7 @@ data class FeedItem(
     val relatedGames: List<FeedItem> = emptyList(),
     val status: String = "",
     val releaseDate: String = "",
-    val accessType: String = "free",
+    val accessType: String = "",
     val purchaseUrl: String? = null,
     val itchUrl: String? = null,
     val microsoftStoreUrl: String? = null,
@@ -137,8 +137,8 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         .takeIf { it.startsWith("https://", ignoreCase = true) }
     val purchaseUrl = o.firstText("purchaseUrl", "purchase_url").takeIf { it.startsWith("https://", ignoreCase = true) }
     val itchUrl = o.firstText("itchUrl", "itch_url").takeIf { it.startsWith("https://", ignoreCase = true) }
-    val microsoftStoreUrl = o.optJSONObject("microsoftStore")?.let { store ->
-        store.firstText("storeUrl", "productUrl", "url").takeIf { it.startsWith("https://", ignoreCase = true) }
+    val microsoftStoreUrl = (o.optJSONObject("microsoftStore") ?: o.optJSONObject("microsoftStoreBadge"))?.let { store ->
+        store.firstText("storeUrl", "productUrl", "url", "href").takeIf { it.startsWith("https://", ignoreCase = true) }
     }
     val genres = (o.optJSONArray("genres") ?: o.optJSONArray("tags") ?: JSONArray()).strings()
     val screenArray = o.optJSONArray("screenshots") ?: o.optJSONArray("gallery") ?: JSONArray()
@@ -179,7 +179,7 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         relatedGames = related,
         status = o.firstText("status", "gameStatus", "game_status").lowercase(),
         releaseDate = o.firstText("releaseDate", "release_date"),
-        accessType = o.firstText("accessType", "access_type").ifBlank { "free" },
+        accessType = o.firstText("accessType", "access_type"),
         purchaseUrl = purchaseUrl,
         itchUrl = itchUrl,
         microsoftStoreUrl = microsoftStoreUrl,
@@ -232,9 +232,9 @@ fun JSONObject.detailItem(fallback: FeedItem): FeedItem {
         purchaseUrl = parsed.purchaseUrl ?: fallback.purchaseUrl,
         itchUrl = parsed.itchUrl ?: fallback.itchUrl,
         microsoftStoreUrl = parsed.microsoftStoreUrl ?: fallback.microsoftStoreUrl,
-        downloadAvailable = parsed.downloadAvailable || fallback.downloadAvailable,
-        launcherAvailable = parsed.launcherAvailable || fallback.launcherAvailable,
-        featured = parsed.featured || fallback.featured,
+        downloadAvailable = if (detail.has("downloadAvailable")) parsed.downloadAvailable else fallback.downloadAvailable,
+        launcherAvailable = if (detail.has("launcherAvailable")) parsed.launcherAvailable else fallback.launcherAvailable,
+        featured = if (detail.has("featured")) parsed.featured else fallback.featured,
         platforms = parsed.platforms.ifEmpty { fallback.platforms }
     )
 }
