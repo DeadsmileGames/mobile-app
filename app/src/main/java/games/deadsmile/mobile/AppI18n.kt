@@ -275,6 +275,10 @@ object AppI18n {
         "Parabéns! Você encontrou os vídeos." to "Great! You found the videos.",
         "Parabéns! Você encontrou sua biblioteca." to "Great! You found your library.",
         "Parabéns! Você chegou à conta e ao login." to "Great! You reached account and sign-in.",
+        "Catálogo de jogos, newswire, vídeos e biblioteca para PC." to "Game catalog, newswire, videos and PC library.",
+        "Deadsmile Games Companion for Android" to "Deadsmile Games Companion for Android",
+        "Consulte o histórico de versões e os APKs publicados no GitHub." to "View version history and APKs published on GitHub.",
+        "Ver histórico de atualizações" to "View update history",
     )
 
     private val spanish = mapOf(
@@ -544,6 +548,10 @@ object AppI18n {
         "Parabéns! Você encontrou os vídeos." to "¡Bien! Has encontrado los vídeos.",
         "Parabéns! Você encontrou sua biblioteca." to "¡Bien! Has encontrado tu biblioteca.",
         "Parabéns! Você chegou à conta e ao login." to "¡Bien! Has llegado a cuenta e inicio de sesión.",
+        "Catálogo de jogos, newswire, vídeos e biblioteca para PC." to "Catálogo de juegos, newswire, vídeos y biblioteca de PC.",
+        "Deadsmile Games Companion for Android" to "Deadsmile Games Companion para Android",
+        "Consulte o histórico de versões e os APKs publicados no GitHub." to "Consulta el historial de versiones y los APK publicados en GitHub.",
+        "Ver histórico de atualizações" to "Ver historial de actualizaciones",
     )
 
     fun translate(context: Context, value: String): String {
