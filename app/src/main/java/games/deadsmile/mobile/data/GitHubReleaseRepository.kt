@@ -158,22 +158,22 @@ object GitHubReleaseRepository {
     }
 
     internal fun isTrustedApkUrl(value: String): Boolean {
-        val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return false
+        val uri = runCatching { java.net.URI(value) }.getOrNull() ?: return false
         val path = uri.path.orEmpty()
         return uri.scheme.equals("https", true) &&
             uri.host.equals("github.com", true) &&
-            uri.userInfo.isNullOrEmpty() &&
+            uri.rawUserInfo.isNullOrEmpty() &&
             uri.port == -1 &&
-            uri.query.isNullOrEmpty() &&
-            uri.fragment.isNullOrEmpty() &&
+            uri.rawQuery.isNullOrEmpty() &&
+            uri.rawFragment.isNullOrEmpty() &&
             path.startsWith("/$OWNER/$REPOSITORY/releases/download/") &&
             path.endsWith(".apk", ignoreCase = true)
     }
 
     private fun isHttpsGithubUrl(value: String): Boolean {
-        val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return false
+        val uri = runCatching { java.net.URI(value) }.getOrNull() ?: return false
         return uri.scheme.equals("https", true) && uri.host.equals("github.com", true) &&
-            uri.userInfo.isNullOrEmpty() && uri.port == -1
+            uri.rawUserInfo.isNullOrEmpty() && uri.port == -1
     }
 
     fun cachedFile(context: Context, release: GitHubRelease): File? {
