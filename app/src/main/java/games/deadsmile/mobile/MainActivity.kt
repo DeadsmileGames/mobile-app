@@ -180,6 +180,7 @@ private fun LibraryScreen(state: UiState, pad: PaddingValues, goAccount: () -> U
 
 @Composable
 private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) {
+    val context = LocalContext.current
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
@@ -215,15 +216,12 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel) 
             OutlinedTextField(password, { password = it }, label = { Text("Senha") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             Button(onClick = { if (registerMode) vm.register(username, email, password) else vm.login(email, password) }, enabled = !state.busy && email.contains("@") && password.isNotBlank() && (!registerMode || username.length in 3..24), modifier = Modifier.fillMaxWidth()) { if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text(if (registerMode) "Criar conta" else "Entrar") }
             TextButton(onClick = { registerMode = !registerMode }) { Text(if (registerMode) "Já tenho uma conta" else "Criar uma conta") }
-            TextButton(onClick = { runCatching { LocalUri.openWebsite() } }) { Text("Ajuda e recuperação de conta no site") }
+            TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://deadsmilegames.vercel.app"))) } }) { Text("Ajuda e recuperação de conta no site") }
         }
         Text("As credenciais são enviadas somente à API oficial por HTTPS.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-private object LocalUri {
-    fun openWebsite() { }
-}
 
 @Composable private fun Section(title: String, action: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
