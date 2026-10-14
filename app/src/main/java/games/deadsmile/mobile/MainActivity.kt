@@ -685,7 +685,7 @@ private fun Home(
                         }
                     }
                 }
-                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes") { openGame(game) } }
+                items(state.games, key = { "home-game-" + it.id }) { game -> FeedCard(game, Modifier.width(320.dp).height(300.dp), "Detalhes", compact = true) { openGame(game) } }
             }
         }
         if (state.loading && state.games.isEmpty()) item { LoadingRow() }
@@ -761,14 +761,14 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
 }
 
 @Composable
-private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, open: () -> Unit) {
+private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, open: () -> Unit) {
     Card(
         modifier = modifier.clickable(onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column {
             if (item.image != null) {
-                Box(Modifier.fillMaxWidth().height(155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                Box(Modifier.fillMaxWidth().height(if (compact) 106.dp else 155.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                     SubcomposeAsyncImage(model = item.image, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) {
                         if (painter.state is AsyncImagePainter.State.Error || painter.state is AsyncImagePainter.State.Empty) {
                             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
@@ -779,16 +779,15 @@ private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: Stri
                 }
             } else {
                 Box(
-                    Modifier.fillMaxWidth().height(112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    Modifier.fillMaxWidth().height(if (compact) 106.dp else 112.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Default.VideogameAsset, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val statusLabel = when (item.status.lowercase()) { "released" -> "Lançado"; "in_development" -> "Em desenvolvimento"; "announced" -> "Anunciado"; else -> "" }
-                if (item.featured) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(7.dp)) { Text("Destaque", Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer) }
                 if (statusLabel.isNotBlank()) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(7.dp)) { Text(statusLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer) }
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                if (item.summary.isNotBlank()) Text(item.summary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (compact) 2 else 3)
                 if (action != null) Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             }
         }
