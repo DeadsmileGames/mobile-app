@@ -191,7 +191,7 @@ private fun DeadsmileRoot(
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS) {
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST) {
                 FloatingDock(page = page, onSelect = { page = it }, reduceMotion = reduceMotion)
             }
         },
@@ -224,7 +224,7 @@ private fun DeadsmileRoot(
                     }
                 }
                 Page.LIBRARY -> LibraryScreen(state, pad) { page = Page.ACCOUNT }
-                Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.WISHLIST; page = Page.WISHLIST }
+                Page.ACCOUNT -> AccountScreen(state, pad, vm) { returnPage = Page.ACCOUNT; page = Page.WISHLIST }
                 Page.WISHLIST -> WishlistScreen(
                     state = state,
                     pad = pad,
