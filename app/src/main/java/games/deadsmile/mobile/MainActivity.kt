@@ -122,10 +122,11 @@ import java.util.concurrent.TimeUnit
 private enum class Page(val label: String) {
     HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
     ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações"),
-    NOTIFICATIONS("Notificações")
+    NOTIFICATIONS("Notificações"), SEARCH("Busca global")
 }
 
 private val BrandInk = Color(0xFF101010)
+private val LocalReduceMotion = staticCompositionLocalOf { false }
 private val FirsNeueTextFamily = FontFamily(Font(R.font.tt_firs_neue_demi_bold, weight = FontWeight.Normal))
 private val PoppinsNumberFamily = FontFamily(
     Font(R.font.poppins_regular, weight = FontWeight.Normal),
@@ -267,6 +268,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
     }
     MaterialTheme(colorScheme = scheme, typography = DeadsmileTypography) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
             DeadsmileRoot(
                 vm = vm,
                 themeMode = themeMode,
@@ -276,8 +278,15 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 reduceMotion = reduceMotion,
                 onReduceMotion = { reduceMotion = it; prefs.edit().putBoolean("reduce_motion", it).apply() },
                 appLanguage = appLanguage,
-                onAppLanguage = { language -> appLanguage = language; prefs.edit().putString("app_language", language).apply() }
+                onAppLanguage = { language ->
+                    appLanguage = language
+                    prefs.edit().putString("app_language", language).apply()
+                    // Re-fetch content using the user-selected language (including age ratings).
+                    vm.reload()
+                    vm.account()
+                }
             )
+            }
         }
     }
 }
@@ -410,7 +419,7 @@ private fun DeadsmileRoot(
 
     BackHandler(enabled = page != Page.HOME && tourStage < 0) {
         page = when (page) {
-            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS -> returnPage.takeIf { it != page } ?: Page.HOME
+            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS, Page.SEARCH -> returnPage.takeIf { it != page } ?: Page.HOME
             else -> Page.HOME
         }
     }
@@ -439,29 +448,35 @@ private fun DeadsmileRoot(
                             Page.DETAILS -> "Detalhes"
                             Page.UPDATES -> "Atualizações"
                             Page.NOTIFICATIONS -> "Notificações"
+                            Page.SEARCH -> "Busca global"
                         }
                         Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS || page == Page.SEARCH) {
                         IconButton(onClick = { page = when (page) { Page.GAMES -> Page.HOME; else -> returnPage.takeIf { it != page } ?: Page.HOME } }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                        IconButton(onClick = { returnPage = page; page = Page.SEARCH }) {
+                            Icon(Icons.Outlined.Search, contentDescription = AppI18n.translate(LocalContext.current, "Buscar em todo o app"))
+                        }
+                    }
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Outlined.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
                     }
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
                         IconButton(onClick = { returnPage = page; page = Page.NOTIFICATIONS }) {
                             Icon(Icons.Outlined.Notifications, contentDescription = AppI18n.translate(LocalContext.current, "Notificações"))
                         }
                     }
-                    if (tourStage < 0 && page != Page.NOTIFICATIONS) {
+                    if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
                         IconButton(onClick = {
                             when (page) {
                                 Page.ACCOUNT -> vm.account()
@@ -475,7 +490,7 @@ private fun DeadsmileRoot(
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && tourStage != 6) {
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH && tourStage != 6) {
                 val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
                 FloatingDock(
                     page = page,
@@ -522,6 +537,12 @@ private fun DeadsmileRoot(
             label = "deadsmile-page"
         ) { targetPage ->
             when (targetPage) {
+                Page.SEARCH -> GlobalSearchScreen(state, pad) { item, isGame ->
+                    detailItem = item
+                    detailIsGame = isGame
+                    returnPage = Page.SEARCH
+                    page = Page.DETAILS
+                }
                 Page.HOME -> Home(
                     state = state, pad = pad,
                     news = { page = Page.NEWS }, videos = { page = Page.VIDEOS },
@@ -571,9 +592,16 @@ private fun DeadsmileRoot(
                     onOpenRelease = { url -> openExternal(context, url) }
                 )
                 Page.DETAILS -> detailItem?.let { item ->
-                    val displayItem = state.detail?.takeIf {
+                    val rawDisplayItem = state.detail?.takeIf {
                         it.id == item.id || (item.slug.isNotBlank() && it.slug == item.slug)
                     } ?: item
+                    val displayItem = if (detailIsGame) rawDisplayItem else {
+                        val referencedGames = state.games.filter { game ->
+                            rawDisplayItem.associatedGameIds.any { ref -> ref.equals(game.id, true) || ref.equals(game.slug, true) } ||
+                                rawDisplayItem.associatedGameSlugs.any { it.equals(game.slug, true) || it.equals(game.id, true) }
+                        }
+                        rawDisplayItem.copy(relatedGames = (rawDisplayItem.relatedGames + referencedGames).distinctBy { it.id })
+                    }
                     GameDetailsScreen(
                         item = displayItem, isGame = detailIsGame, pad = pad,
                         loading = state.detailLoading,
@@ -778,7 +806,7 @@ private fun Home(
             Section("Seu catálogo", if (state.games.isEmpty()) "" else "Ver todos", openCatalog)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(end = 2.dp)) {
                 items(state.games.take(12), key = { "home-game-" + it.id }) { game ->
-                    FeedCard(game, Modifier.width(178.dp).height(276.dp), "Detalhes", compact = true, preferPoster = true) { openGame(game) }
+                    GamePosterCard(game, Modifier.width(178.dp).aspectRatio(0.68f)) { openGame(game) }
                 }
             }
         }
@@ -804,18 +832,7 @@ private fun Section(title: String, action: String, onClick: () -> Unit) {
 
 @Composable
 private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
-    var query by rememberSaveable(title) { mutableStateOf("") }
     val isVideoFeed = title.equals("Vídeos", ignoreCase = true) || title.equals("Videos", ignoreCase = true)
-    val searchable = title == "Catálogo de jogos" || title == "Últimas notícias" || isVideoFeed
-    val filtered = remember(content, query) {
-        val term = query.trim()
-        if (term.isBlank()) content else content.filter {
-            it.title.contains(term, ignoreCase = true) ||
-                it.summary.contains(term, ignoreCase = true) ||
-                it.body.contains(term, ignoreCase = true) ||
-                it.genres.any { genre -> genre.contains(term, ignoreCase = true) }
-        }
-    }
     if (loading && content.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -832,29 +849,12 @@ private fun FeedScreen(title: String, content: List<FeedItem>, loading: Boolean,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        if (searchable) item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(if (title == "Catálogo de jogos") "Buscar jogos" else "Buscar conteúdo") },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Outlined.Close, contentDescription = AppI18n.translate(LocalContext.current, "Limpar busca"))
-                    }
-                }
-            )
-        }
-        if (filtered.isEmpty()) {
-            item { Empty("Nenhum resultado para essa busca. Tente outro termo.") }
-        } else if (isVideoFeed) {
-            items(filtered, key = { it.id }) { video ->
+        if (isVideoFeed) {
+            items(content, key = { it.id }) { video ->
                 VideoThumbnailCard(video, Modifier.fillMaxWidth().aspectRatio(16f / 9f)) { open(video) }
             }
         } else {
-            items(filtered, key = { it.id }) { item ->
+            items(content, key = { it.id }) { item ->
                 FeedCard(item, Modifier.fillMaxWidth().height(292.dp)) { open(item) }
             }
         }
@@ -903,13 +903,14 @@ private fun GameArtwork(item: FeedItem, modifier: Modifier = Modifier, contentSc
 private fun FeedCard(item: FeedItem, modifier: Modifier = Modifier, action: String? = null, compact: Boolean = false, preferPoster: Boolean = false, open: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = LocalReduceMotion.current
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.985f else 1f,
+        targetValue = if (!reduceMotion && pressed) 0.985f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "feed-card-press"
     )
     Card(
-        modifier = modifier.animateContentSize().graphicsLayer { scaleX = scale; scaleY = scale }.clickable(interactionSource = interaction, indication = null, onClick = open),
+        modifier = modifier.then(if (reduceMotion) Modifier else Modifier.animateContentSize()).graphicsLayer { scaleX = scale; scaleY = scale }.clickable(interactionSource = interaction, indication = null, onClick = open),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -937,13 +938,14 @@ private fun VideoThumbnailCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = LocalReduceMotion.current
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.975f else 1f,
+        targetValue = if (!reduceMotion && pressed) 0.975f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "video-thumbnail-press"
     )
     Card(
-        modifier = modifier.animateContentSize()
+        modifier = modifier.then(if (reduceMotion) Modifier else Modifier.animateContentSize())
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clickable(interactionSource = interaction, indication = null, onClick = open),
         shape = RoundedCornerShape(20.dp)
@@ -1291,7 +1293,7 @@ private fun GameAvailabilityCard(item: FeedItem) {
 private fun formatDisplayDate(value: String, context: Context): String {
     val raw = value.trim()
     if (raw.isBlank()) return ""
-    val locale = runCatching { context.resources.configuration.locales[0] }.getOrNull() ?: java.util.Locale.getDefault()
+    val locale = AppI18n.selectedLocale(context)
     val date = runCatching { java.time.Instant.parse(raw).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }.getOrNull()
         ?: runCatching { java.time.OffsetDateTime.parse(raw).toLocalDate() }.getOrNull()
         ?: runCatching { java.time.LocalDate.parse(raw.take(10)) }.getOrNull()
@@ -2060,62 +2062,58 @@ private fun LanguageSelectionOverlay(onSelect: (String) -> Unit) {
 
 @Composable
 private fun GameCatalogScreen(content: List<FeedItem>, loading: Boolean, pad: PaddingValues, open: (FeedItem) -> Unit) {
-    var query by rememberSaveable { mutableStateOf("") }
-    val filtered = remember(content, query) {
-        val q = query.trim()
-        if (q.isBlank()) content else content.filter {
-            it.title.contains(q, true) || it.summary.contains(q, true) || it.genres.any { g -> g.contains(q, true) }
-        }
-    }
     if (loading && content.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    Column(Modifier.fillMaxSize().padding(pad)) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            placeholder = { Text("Buscar jogos") }, singleLine = true,
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-            trailingIcon = {
-                if (query.isNotBlank()) IconButton(onClick = { query = "" }) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Limpar busca")
-                }
-            }
-        )
-        if (filtered.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) {
-                Empty(if (content.isEmpty()) "O catálogo não está disponível agora. Tente atualizar em alguns instantes." else "Nenhum jogo corresponde à busca.")
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 156.dp),
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+    if (content.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(pad).padding(22.dp), contentAlignment = Alignment.Center) {
+            Empty("O catálogo não está disponível agora. Tente atualizar em alguns instantes.")
+        }
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 156.dp),
+        modifier = Modifier.fillMaxSize().padding(pad),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        gridItems(content, key = { it.id }) { game ->
+            GamePosterCard(game, Modifier.fillMaxWidth().aspectRatio(0.68f)) { open(game) }
+        }
+    }
+}
+
+@Composable
+private fun GamePosterCard(item: FeedItem, modifier: Modifier = Modifier, open: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = LocalReduceMotion.current
+    val scale by animateFloatAsState(
+        targetValue = if (!reduceMotion && pressed) 0.975f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "game-poster-press"
+    )
+    val poster = item.posterImage?.takeIf { it.isNotBlank() } ?: item.image
+    Card(
+        modifier = modifier.then(if (reduceMotion) Modifier else Modifier.animateContentSize())
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = interaction, indication = null, onClick = open),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+            GameArtwork(if (poster != item.image) item.copy(image = poster) else item, Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .74f)))
+            ))
+            Surface(
+                modifier = Modifier.align(Alignment.BottomStart).padding(9.dp).fillMaxWidth(.96f),
+                color = Color.Black.copy(alpha = .70f),
+                shape = RoundedCornerShape(9.dp)
             ) {
-                gridItems(filtered, key = { it.id }) { game ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().animateContentSize().clickable { open(game) },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-                    ) {
-                        Column(Modifier.fillMaxWidth()) {
-                            Box(Modifier.fillMaxWidth().aspectRatio(0.68f).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                                val poster = game.posterImage?.takeIf { it.isNotBlank() } ?: game.image
-                                GameArtwork(if (poster != game.image) game.copy(image = poster) else game, Modifier.fillMaxSize())
-                            }
-                            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(game.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                val subtitle = game.summary.ifBlank { game.genres.take(2).joinToString(" · ") }
-                                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text("Ver detalhes", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
+                Text(item.title, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
