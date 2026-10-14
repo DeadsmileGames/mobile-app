@@ -373,6 +373,7 @@ object AppI18n {
         "Muitas tentativas em sequência. Aguarde um pouco e tente novamente." to "Too many attempts in a row. Please wait a moment and try again.",
         "O serviço está indisponível agora. Tente novamente mais tarde." to "The service is unavailable right now. Please try again later.",
         "Não foi possível concluir agora. Tente novamente." to "Could not complete this right now. Please try again.",
+        "English" to "English",
     )
 
     private val spanish = mapOf(
