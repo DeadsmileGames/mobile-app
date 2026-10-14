@@ -733,6 +733,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var websiteUrl by rememberSaveable { mutableStateOf("") }
     var location by rememberSaveable { mutableStateOf("") }
     var avatarUrl by rememberSaveable { mutableStateOf("") }
+    var avatarUrlInput by rememberSaveable { mutableStateOf("") }
     var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -742,6 +743,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             avatarPickerMessage = "Não foi possível usar essa imagem. Escolha outra foto."
         } else {
             avatarUrl = encoded
+            avatarUrlInput = ""
             avatarPickerMessage = "Foto selecionada. Salve o perfil para aplicar."
         }
     }
@@ -762,6 +764,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             websiteUrl = profile.websiteUrl
             location = profile.location
             avatarUrl = profile.avatarUrl
+            avatarUrlInput = profile.avatarUrl.takeUnless { it.startsWith("data:image/") }.orEmpty()
         }
     }
     LaunchedEffect(state.privacy) {
@@ -794,9 +797,23 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(location, { location = it.take(120) }, label = { Text("Localização") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(avatarUrl, { avatarUrl = it.take(500_000) }, label = { Text("URL da foto (opcional)") }, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(
+                            value = avatarUrlInput,
+                            onValueChange = { avatarUrlInput = it.take(5000); avatarUrl = avatarUrlInput },
+                            label = { Text("URL da foto (opcional)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         OutlinedButton(onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
+                        }
+                        if (avatarUrl.startsWith("data:image/")) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                AccountAvatar(avatarUrl, Modifier.size(54.dp))
+                                Text("Foto local selecionada", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { avatarUrl = ""; avatarUrlInput = "" }) { Text("Remover") }
+                            }
                         }
                         avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
@@ -804,7 +821,15 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                             enabled = !state.busy && username.trim().length in 3..24,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)
                         ) { Text(if (state.busy) "Salvando…" else "Salvar perfil") }
-                        TextButton(onClick = { editingProfile = false; profile?.let { username = it.username; fullName = it.fullName; profileBio = it.bio; websiteUrl = it.websiteUrl; location = it.location; avatarUrl = it.avatarUrl } }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
+                        TextButton(onClick = { editingProfile = false; profile?.let {
+                            username = it.username
+                            fullName = it.fullName
+                            profileBio = it.bio
+                            websiteUrl = it.websiteUrl
+                            location = it.location
+                            avatarUrl = it.avatarUrl
+                            avatarUrlInput = it.avatarUrl.takeUnless { value -> value.startsWith("data:image/") }.orEmpty()
+                        } }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
                     } else {
                         if (profile?.bio?.isNotBlank() == true) Text(profile.bio, style = MaterialTheme.typography.bodyMedium)
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
