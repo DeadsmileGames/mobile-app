@@ -290,6 +290,7 @@ private fun DeadsmileRoot(
                         },
                         onRelated = { related -> detailItem = related; detailIsGame = true },
                         onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
+                        onOpenExternal = { url -> openExternal(context, url) },
                         onOpenVideo = { displayItem.url?.let { url -> openExternal(context, url) } }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
@@ -502,6 +503,7 @@ private fun GameDetailsScreen(
     onToggleWishlist: () -> Unit,
     onRelated: (FeedItem) -> Unit,
     onOpenSite: () -> Unit,
+    onOpenExternal: (String) -> Unit,
     onOpenVideo: () -> Unit
 ) {
     LazyColumn(
@@ -555,16 +557,16 @@ private fun GameDetailsScreen(
                             }
                         }
                     }
-                    Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Disponível para PC", fontWeight = FontWeight.SemiBold)
-                                Text("A instalação pelo celular ainda não está disponível. Você pode consultar os detalhes no site ou usar o launcher para Windows.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+                    GameAvailabilityCard(item)
+                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Visitar site oficial") }
+                    if (item.microsoftStoreUrl != null) {
+                        OutlinedButton(onClick = { onOpenExternal(item.microsoftStoreUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir Microsoft Store") }
                     }
-                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Ver no site Deadsmile") }
+                    if (item.itchUrl != null) {
+                        OutlinedButton(onClick = { onOpenExternal(item.itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver página no itch.io") }
+                    } else if (item.purchaseUrl != null) {
+                        OutlinedButton(onClick = { onOpenExternal(item.purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver opções de compra") }
+                    }
                     OutlinedButton(onClick = onToggleWishlist, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
                         Icon(if (isWishlisted) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null)
                         Spacer(Modifier.width(8.dp))
@@ -604,6 +606,71 @@ private fun GameDetailsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun GameAvailabilityCard(item: FeedItem) {
+    var now by remember(item.releaseDate, item.status) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(item.releaseDate, item.status) { while (true) { delay(1000); now = System.currentTimeMillis() } }
+    val target = remember(item.releaseDate) { releaseTargetMillis(item.releaseDate) }
+    val remaining = target?.minus(now)
+    val countdown = if (remaining != null && remaining > 0L) {
+        val total = remaining / 1000L
+        val days = total / 86_400L
+        val hours = (total % 86_400L) / 3_600L
+        val minutes = (total % 3_600L) / 60L
+        val seconds = total % 60L
+        listOfNotNull(
+            days.takeIf { it > 0 }?.let { "\${it}d" },
+            hours.takeIf { days > 0 || it > 0 }?.let { "\${it}h" },
+            minutes.takeIf { days > 0 || hours > 0 || it > 0 }?.let { "\${it}m" },
+            seconds.takeIf { days == 0L && hours == 0L && minutes == 0L }?.let { "\${it}s" }
+        ).joinToString(" ")
+    } else null
+    val released = item.status.equals("released", true)
+    val inDevelopment = item.status.equals("in_development", true)
+    val announced = item.status.equals("announced", true)
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Icon(when {
+                released && item.launcherAvailable -> Icons.Default.VideogameAsset
+                inDevelopment || announced -> Icons.Default.Notifications
+                else -> Icons.Default.Article
+            }, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(when {
+                    released && item.launcherAvailable -> "Publicado · disponível no launcher para Windows"
+                    released -> "Publicado · download ainda não configurado"
+                    inDevelopment -> "Em desenvolvimento"
+                    announced -> "Jogo anunciado"
+                    else -> "Estado do jogo"
+                }, fontWeight = FontWeight.SemiBold)
+                Text(when {
+                    released && item.launcherAvailable -> "O catálogo confirma que o jogo está publicado. Para instalar ou jogar, use o launcher no PC."
+                    released -> "O jogo está marcado como publicado, mas a API não confirma um download configurado. Consulte os canais oficiais."
+                    inDevelopment && countdown != null -> "Lançamento previsto em $countdown."
+                    inDevelopment && item.releaseDate.isNotBlank() && target != null && target <= now -> "A data prevista passou, mas o catálogo ainda marca o jogo como em desenvolvimento."
+                    inDevelopment && item.releaseDate.isNotBlank() -> "Data prevista: \${item.releaseDate.take(10)}."
+                    inDevelopment -> "Ainda não há uma data de lançamento publicada."
+                    announced && countdown != null -> "Anunciado. Lançamento previsto em $countdown."
+                    announced && item.releaseDate.isNotBlank() -> "Data prevista: \${item.releaseDate.take(10)}."
+                    announced -> "O jogo foi anunciado, mas a data de lançamento ainda não foi divulgada."
+                    else -> "Não há dados suficientes para confirmar a disponibilidade deste jogo. Consulte o site oficial."
+                }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (item.accessType.equals("paid", true)) Text("Acesso pago", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                else if (item.accessType.equals("free", true)) Text("Gratuito", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+private fun releaseTargetMillis(value: String): Long? {
+    val raw = value.trim()
+    if (raw.isBlank()) return null
+    runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()?.let { return it }
+    runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }.getOrNull()?.let { return it }
+    val date = runCatching { java.time.LocalDate.parse(raw.take(10)) }.getOrNull() ?: return null
+    return date.atTime(23, 59, 59).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 @Composable
