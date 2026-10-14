@@ -985,118 +985,150 @@ private fun GameDetailsScreen(
 ) {
     LazyColumn(
         Modifier.fillMaxSize().padding(pad),
-        contentPadding = PaddingValues(bottom = 34.dp),
+        contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item {
-            Box(Modifier.fillMaxWidth().height(285.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                GameArtwork(item, Modifier.fillMaxSize())
-                if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) {
-                    Box(Modifier.fillMaxSize().background(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f))
-                        )
-                    ))
+            if (isGame) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(17.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        val poster = item.posterImage?.takeIf { it.isNotBlank() } ?: item.image
+                        Box(
+                            Modifier.size(112.dp, 164.dp).clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        ) {
+                            GameArtwork(if (poster != item.image) item.copy(image = poster) else item, Modifier.fillMaxSize())
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text(
+                                item.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                item.developer.ifBlank { item.publisher }.ifBlank { "Deadsmile Games" },
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (item.summary.isNotBlank()) Text(
+                                item.summary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(onClick = onOpenSite, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
+                            Text("Visitar site oficial")
+                        }
+                        OutlinedIconButton(onClick = onToggleWishlist, modifier = Modifier.size(52.dp)) {
+                            Icon(
+                                if (isWishlisted) Icons.Outlined.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = AppI18n.translate(
+                                    LocalContext.current,
+                                    if (isWishlisted) "Remover da lista de desejos" else "Adicionar à lista de desejos"
+                                )
+                            )
+                        }
+                    }
+                    GameAgeRatingSection(item)
+                    GameAvailabilityCard(item)
+                    item.microsoftStoreUrl?.let { storeUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(storeUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Abrir Microsoft Store")
+                        }
+                    }
+                    item.itchUrl?.let { itchUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Ver página no itch.io")
+                        }
+                    } ?: item.purchaseUrl?.let { purchaseUrl ->
+                        OutlinedButton(onClick = { onOpenExternal(purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Ver opções de compra")
+                        }
+                    }
+                    item.trailerUrl?.let { trailer ->
+                        OutlinedButton(onClick = { onOpenExternal(trailer) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Abrir trailer no navegador")
+                        }
+                    }
                 }
-                Column(Modifier.align(Alignment.BottomStart).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            } else {
+                Box(Modifier.fillMaxWidth().height(230.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                    GameArtwork(item, Modifier.fillMaxSize())
+                    Box(Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f)))
+                    ))
                     Text(
                         item.title,
-                        style = MaterialTheme.typography.headlineMedium,
+                        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp),
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (item.image != null || (item.title.contains("abby", true) && item.title.contains("restless", true))) Color.White else MaterialTheme.colorScheme.onSurface
+                        color = Color.White,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
         }
         item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
                 if (loading) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         Text("Carregando informações…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (item.summary.isNotBlank()) Text(item.summary, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (isGame) {
-                    val rating = item.ageRating.ifBlank { "Não informada pela plataforma" }
-                    val meta = listOfNotNull(
-                        item.developer.takeIf { it.isNotBlank() }?.let { "Desenvolvido por $it" },
-                        item.publisher.takeIf { it.isNotBlank() }?.let { "Publicado por $it" },
-                        item.genres.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Gêneros: $it" },
-                        "Classificação indicativa: $rating",
-                        item.ratingSystem.takeIf { it.isNotBlank() }?.let { "Sistema de classificação: $it" },
-                        item.ratingDescription.takeIf { it.isNotBlank() }?.let { "Descrição da classificação: $it" },
-                        item.ratingDescriptors.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Descritores de conteúdo: $it" },
-                        item.ratingDisclaimers.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Avisos de conteúdo: $it" },
-                        item.engine.takeIf { it.isNotBlank() }?.let { "Motor gráfico: $it" },
-                        item.version.takeIf { it.isNotBlank() }?.let { "Versão: $it" },
-                        "Salvamento na nuvem: " + if (item.cloudSavesEnabled) "Habilitado" else "Não habilitado",
-                        item.supportedLanguages.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Idiomas suportados: $it" },
-                        item.features.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "Recursos: $it" },
-                        item.savePathTemplate.takeIf { it.isNotBlank() }?.let { "Modelo de salvamento: $it" },
-                        item.releaseDate.takeIf { it.isNotBlank() }?.let { "Data de lançamento: ${formatDisplayDate(it, LocalContext.current)}" },
-                        item.featured.takeIf { it }?.let { "Em destaque" }
-                    )
-                    if (meta.isNotEmpty()) {
-                        Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                            Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                item.ratingImageUrl?.let { ratingImage ->
-                                    AsyncImage(
-                                        model = ratingImage,
-                                        contentDescription = AppI18n.translate(LocalContext.current, "Selo de classificação indicativa"),
-                                        modifier = Modifier.size(width = 88.dp, height = 52.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                }
-                                meta.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                            }
-                        }
-                    }
-                    GameAvailabilityCard(item)
-                    Button(onClick = onOpenSite, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Visitar site oficial") }
-                    item.microsoftStoreUrl?.let { storeUrl ->
-                        OutlinedButton(onClick = { onOpenExternal(storeUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir Microsoft Store") }
-                    }
-                    item.itchUrl?.let { itchUrl ->
-                        OutlinedButton(onClick = { onOpenExternal(itchUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver página no itch.io") }
-                    } ?: item.purchaseUrl?.let { purchaseUrl ->
-                        OutlinedButton(onClick = { onOpenExternal(purchaseUrl) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Ver opções de compra") }
-                    }
-                    item.trailerUrl?.let { trailer ->
-                        OutlinedButton(onClick = { onOpenExternal(trailer) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir trailer no navegador") }
-                    }
-                    OutlinedButton(onClick = onToggleWishlist, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-                        Icon(if (isWishlisted) Icons.Outlined.Favorite else Icons.Default.FavoriteBorder, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (isWishlisted) "Remover da lista de desejos" else "Adicionar à lista de desejos")
-                    }
-                } else {
+                if (!isGame) {
+                    if (item.summary.isNotBlank()) Text(item.summary, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val dateLabel = item.publishedAt.takeIf { it.isNotBlank() }?.let { formatDisplayDate(it, LocalContext.current) }.orEmpty()
                     val byline = listOf(item.author, dateLabel).filter { it.isNotBlank() }.joinToString(" · ")
                     if (byline.isNotBlank()) Text(byline, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
-                Text(if (isGame) "Sobre o jogo" else "Artigo completo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                val completeBody = item.body.ifBlank { item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." } }
-                val normalizedBody = if (isGame) completeBody.replace(
-                    Regex("(?i)^\\s*(?:about\\s+the\\s+games?|sobre\\s+o\\s+jogo|sobre\\s+el\\s+juego)\\s*:?\\s*\\R+"), ""
-                ).trim() else completeBody
-                Text(normalizedBody.ifBlank { item.summary }, style = MaterialTheme.typography.bodyLarge, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.14f)
+                // Keep database-authored game content; don't add a second About the game heading.
+                val completeBody = item.body.ifBlank {
+                    item.summary.ifBlank { "Mais informações serão adicionadas assim que estiverem disponíveis." }
+                }
+                Text(
+                    completeBody,
+                    style = MaterialTheme.typography.bodyLarge,
+                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.14f
+                )
                 if (item.screenshots.isNotEmpty()) {
                     Text(if (isGame) "Capturas de tela" else "Imagens do artigo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(item.screenshots, key = { it }) { screenshot ->
                             SubcomposeAsyncImage(
                                 model = screenshot,
-                                contentDescription = AppI18n.translate(LocalContext.current, "Captura de tela de ${item.title}"),
-                                modifier = Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                contentDescription = AppI18n.translate(LocalContext.current, "Captura de tela de " + item.title),
+                                modifier = Modifier.width(275.dp).height(160.dp).clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                                 contentScale = ContentScale.Crop
                             ) {
-                                if (painter.state is AsyncImagePainter.State.Success) {
-                                    SubcomposeAsyncImageContent()
-                                } else {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                                if (painter.state is AsyncImagePainter.State.Success) SubcomposeAsyncImageContent()
+                                else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.VideogameAsset, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -1106,7 +1138,7 @@ private fun GameDetailsScreen(
                     Text("Jogos relacionados", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(item.relatedGames, key = { it.id }) { related ->
-                            FeedCard(related, Modifier.width(205.dp), "Ver detalhes") { onRelated(related) }
+                            FeedCard(related, Modifier.width(205.dp), "Ver detalhes", preferPoster = true) { onRelated(related) }
                         }
                     }
                 }
@@ -1119,6 +1151,68 @@ private fun GameDetailsScreen(
                     OutlinedButton(onClick = onOpenSite, modifier = Modifier.fillMaxWidth()) { Text("Visitar Deadsmile Games") }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GameAgeRatingSection(item: FeedItem) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text("Classificação indicativa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (!item.ratingImageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.ratingImageUrl,
+                    contentDescription = AppI18n.translate(LocalContext.current, "Selo de classificação indicativa"),
+                    modifier = Modifier.size(116.dp),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = AppI18n.translate(LocalContext.current, "Selo de classificação indicativa"),
+                    modifier = Modifier.size(82.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                item.ageRating.ifBlank { "Não informada pela plataforma" },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            if (item.ratingDescription.isNotBlank()) Text(
+                item.ratingDescription,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (item.ratingSystem.isNotBlank()) Text(
+                "Sistema de classificação: " + item.ratingSystem,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (item.ratingDescriptors.isNotEmpty()) Text(
+                "Descritores de conteúdo: " + item.ratingDescriptors.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (item.ratingDisclaimers.isNotEmpty()) Text(
+                "Avisos de conteúdo: " + item.ratingDisclaimers.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
