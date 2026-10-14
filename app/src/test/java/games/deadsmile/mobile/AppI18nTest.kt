@@ -52,7 +52,14 @@ class AppI18nTest {
             Triple("Algumas informações precisam ser corrigidas.", "Some information needs to be corrected.", "Hay que corregir algunos datos."),
             Triple("Muitas tentativas em sequência. Aguarde um pouco e tente novamente.", "Too many attempts in a row. Please wait a moment and try again.", "Demasiados intentos seguidos. Espera un momento e inténtalo de nuevo."),
             Triple("O serviço está indisponível agora. Tente novamente mais tarde.", "The service is unavailable right now. Please try again later.", "El servicio no está disponible ahora. Inténtalo de nuevo más tarde."),
-            Triple("Não foi possível concluir agora. Tente novamente.", "Could not complete this right now. Please try again.", "No se pudo completar ahora. Inténtalo de nuevo.")
+            Triple("Não foi possível concluir agora. Tente novamente.", "Could not complete this right now. Please try again.", "No se pudo completar ahora. Inténtalo de nuevo."),
+            Triple("Perfil atualizado.", "Profile updated.", "Perfil actualizado."),
+            Triple("Dispositivo desconectado.", "Device disconnected.", "Dispositivo desconectado."),
+            Triple("Agora adicione a chave ao seu aplicativo autenticador.", "Now add the key to your authenticator app.", "Ahora añade la clave a tu aplicación de autenticación."),
+            Triple("Entre na conta para usar sua lista de desejos.", "Sign in to use your wishlist.", "Inicia sesión para usar tu lista de deseos."),
+            Triple("Jogo removido da lista de desejos.", "Game removed from wishlist.", "Juego eliminado de la lista de deseos."),
+            Triple("Login realizado.", "Login successful.", "Inicio de sesión correcto."),
+            Triple("Confira os dados informados e tente novamente.", "Check the information you entered and try again.", "Revisa los datos que has introducido e inténtalo de nuevo."),
         )
         messages.forEach { (source, english, spanish) ->
             assertEquals("English translation for: " + source, english, AppI18n.translate("en", source))
