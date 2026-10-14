@@ -328,12 +328,18 @@ private fun DeadsmileRoot(
         try {
             releases = GitHubReleaseRepository.fetchReleases()
             val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME)
-            if (newest != null && BuildConfig.APPLICATION_ID == "games.deadsmile.mobile") beginUpdateDownload(newest)
+            // Update download is deferred until the one-time tour ends.
         } catch (error: Exception) {
             releaseError = error.message ?: "Não foi possível carregar as releases do GitHub."
         } finally {
             releasesLoading = false
         }
+    }
+
+    LaunchedEffect(tourStage, releasesLoading, releases) {
+        if (tourStage >= 0 || releasesLoading || BuildConfig.APPLICATION_ID != "games.deadsmile.mobile") return@LaunchedEffect
+        val newest = GitHubReleaseRepository.latestNewerRelease(releases, BuildConfig.VERSION_NAME) ?: return@LaunchedEffect
+        if (updateBusyVersion == null) beginUpdateDownload(newest)
     }
 
     BackHandler(enabled = page == Page.SETTINGS || page == Page.DETAILS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES) {
@@ -557,6 +563,47 @@ private fun DeadsmileRoot(
 }
 
 @Composable
+private fun TourWelcomeOverlay(onStart: () -> Unit, onSkip: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Bem-vindo ao Deadsmile Games Companion", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Conheça as áreas principais do Companion. O tour vai destacar cada aba e explicar o que você encontra nela.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Começar tour") }
+                TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Pular por enquanto") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TourStepOverlay(title: String, description: String, onSkip: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)).padding(16.dp), contentAlignment = Alignment.TopCenter) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp).padding(top = 12.dp), shape = RoundedCornerShape(24.dp)) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Toque na aba destacada na barra inferior para continuar.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = onSkip, modifier = Modifier.align(Alignment.End)) { Text("Pular tour") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TourThanksOverlay(onFinish: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)).padding(20.dp), contentAlignment = Alignment.Center) {
+        Card(Modifier.fillMaxWidth().widthIn(max = 440.dp), shape = RoundedCornerShape(28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Obrigado por conhecer o Companion!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Você chegou à área da conta. Entre para sincronizar sua biblioteca e sua lista de desejos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Concluir e acessar a conta") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit, reduceMotion: Boolean) {
     val destinations = listOf(
         Triple(Page.HOME, Icons.Default.Home, "Início"),
@@ -584,11 +631,14 @@ private fun FloatingDock(page: Page, tourTarget: Page?, onSelect: (Page) -> Unit
             ) {
                 destinations.forEach { (target, icon, label) ->
                     val active = (if (page == Page.GAMES) Page.HOME else page) == target
+                    val isTourTarget = tourTarget == target
                     Surface(
                         onClick = { onSelect(target) },
                         shape = RoundedCornerShape(26.dp),
-                        color = if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isTourTarget) MaterialTheme.colorScheme.primaryContainer else if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                        contentColor = if (isTourTarget) MaterialTheme.colorScheme.onPrimaryContainer else if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        border = if (isTourTarget) androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
+                        shadowElevation = if (isTourTarget) 8.dp else 0.dp,
                         modifier = Modifier.animateContentSize(tween(if (reduceMotion) 0 else 180))
                     ) {
                         Row(
