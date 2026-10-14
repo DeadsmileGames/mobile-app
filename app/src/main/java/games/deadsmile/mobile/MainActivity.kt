@@ -4,9 +4,12 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +23,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -58,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +81,7 @@ import games.deadsmile.mobile.data.FeedItem
 import games.deadsmile.mobile.data.UiState
 import games.deadsmile.mobile.data.PrivacyOptions
 import kotlinx.coroutines.delay
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 private enum class Page(val label: String) {
@@ -723,7 +729,18 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
     var websiteUrl by rememberSaveable { mutableStateOf("") }
     var location by rememberSaveable { mutableStateOf("") }
     var avatarUrl by rememberSaveable { mutableStateOf("") }
+    var avatarPickerMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var editingProfile by rememberSaveable { mutableStateOf(false) }
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val encoded = runCatching { encodeProfileImage(context, uri) }.getOrNull()
+        if (encoded.isNullOrBlank()) {
+            avatarPickerMessage = "Não foi possível usar essa imagem. Escolha outra foto."
+        } else {
+            avatarUrl = encoded
+            avatarPickerMessage = "Foto selecionada. Salve o perfil para aplicar."
+        }
+    }
     var showEmailForm by rememberSaveable { mutableStateOf(false) }
     var newEmail by rememberSaveable { mutableStateOf("") }
     var currentPassword by rememberSaveable { mutableStateOf("") }
@@ -758,13 +775,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
             Card(shape = RoundedCornerShape(26.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        if (!profile?.avatarUrl.isNullOrBlank()) {
-                            AsyncImage(profile?.avatarUrl, contentDescription = "Foto do perfil", Modifier.size(68.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-                        } else {
-                            Box(Modifier.size(68.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.AccountCircle, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            }
-                        }
+                        AccountAvatar(profile?.avatarUrl, Modifier.size(68.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(profile?.fullName?.ifBlank { state.user.username } ?: state.user.username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text("@" + (profile?.username?.ifBlank { state.user.username } ?: state.user.username), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -779,7 +790,11 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         OutlinedTextField(profileBio, { profileBio = it.take(500) }, label = { Text("Biografia") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(websiteUrl, { websiteUrl = it.take(2000) }, label = { Text("Site pessoal") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(location, { location = it.take(120) }, label = { Text("Localização") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(avatarUrl, { avatarUrl = it.take(5000) }, label = { Text("URL da foto (opcional)") }, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(avatarUrl, { avatarUrl = it.take(500_000) }, label = { Text("URL da foto (opcional)") }, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = { avatarPicker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text("Escolher foto do dispositivo")
+                        }
+                        avatarPickerMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Button(
                             onClick = { vm.saveProfile(fullName, username, profileBio, websiteUrl, location, avatarUrl); editingProfile = false },
                             enabled = !state.busy && username.trim().length in 3..24,
@@ -1030,6 +1045,66 @@ private fun BrushVerticalShade(): androidx.compose.ui.graphics.Brush =
     androidx.compose.ui.graphics.Brush.verticalGradient(
         colors = listOf(Color(0xAA090810), Color(0x33090810), Color(0xDD090810))
     )
+
+
+@Composable
+private fun AccountAvatar(url: String?, modifier: Modifier = Modifier) {
+    val bitmap = remember(url) { decodeProfileImage(url) }
+    when {
+        bitmap != null -> Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Foto do perfil",
+            modifier = modifier.clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        !url.isNullOrBlank() -> AsyncImage(
+            model = url,
+            contentDescription = "Foto do perfil",
+            modifier = modifier.clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+        else -> Box(
+            modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.AccountCircle, null, Modifier.fillMaxSize().padding(4.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
+}
+
+private fun decodeProfileImage(value: String?): Bitmap? {
+    val raw = value?.takeIf { it.startsWith("data:image/") && it.length <= 500_000 } ?: return null
+    val comma = raw.indexOf(',')
+    if (comma < 0) return null
+    val bytes = runCatching { Base64.decode(raw.substring(comma + 1), Base64.DEFAULT) }.getOrNull() ?: return null
+    return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+}
+
+private fun encodeProfileImage(context: Context, uri: Uri): String? {
+    val resolver = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sampleSize = 1
+    while (bounds.outWidth / sampleSize > 640 || bounds.outHeight / sampleSize > 640) sampleSize *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+    val scaled = if (decoded.width > 512 || decoded.height > 512) {
+        val ratio = minOf(512f / decoded.width, 512f / decoded.height)
+        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
+    } else decoded
+    val stream = ByteArrayOutputStream()
+    var quality = 84
+    do {
+        stream.reset()
+        scaled.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+        quality -= 8
+    } while (stream.size() > 340_000 && quality >= 44)
+    if (scaled !== decoded) scaled.recycle()
+    decoded.recycle()
+    val encoded = "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+    return encoded.takeIf { it.length <= 500_000 }
+}
 
 @Composable
 private fun SettingsScreen(
