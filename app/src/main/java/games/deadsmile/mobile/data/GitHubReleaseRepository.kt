@@ -95,7 +95,7 @@ object GitHubReleaseRepository {
                             val name = asset.optString("name")
                             val url = asset.optString("browser_download_url")
                             if (!name.endsWith(".apk", ignoreCase = true) || !isTrustedApkUrl(url)) continue
-                            val nameVersion = Regex("""(?i)(?:companion|mobile)[-_ ]v?(\\d+(?:\\.\\d+){1,3})""")
+                            val nameVersion = Regex("""(?i)(?:companion|mobile)[-_ ]v?(\d+(?:\.\d+){1,3})""")
                                 .find(name)?.groupValues?.getOrNull(1)
                             if (nameVersion != null && compareVersions(nameVersion, version) != 0) continue
                             apkName = name
@@ -137,7 +137,7 @@ object GitHubReleaseRepository {
     internal fun normalizeVersion(value: String): String? {
         val normalized = value.trim().removePrefix("v").removePrefix("V").substringBefore('+')
         val core = normalized.substringBefore('-')
-        if (!core.matches(Regex("""\\d+(?:\\.\\d+){1,3}"""))) return null
+        if (!core.matches(Regex("""\d+(?:\.\d+){1,3}"""))) return null
         return core.split('.').mapNotNull { it.toIntOrNull() }.takeIf { it.isNotEmpty() }?.joinToString(".")
     }
 
