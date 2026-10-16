@@ -146,7 +146,7 @@ RELEASE_CHECKS = [
     ("website links use the canonical Render host", '"https://deadsmilegames.onrender.com"' in MODEL and "deadsmilegames.vercel.app" not in MAIN),
     ("mobile API client retains the configured API host", "https://api-ust8.onrender.com/api" in API),
     ("video game cover maps separately from the video thumbnail", all(token in MODEL for token in ("gameCoverImage: String?", '"game_cover_image"', "gameCoverImage = gameCoverImage"))),
-    ("video cards and detail artwork prefer the game cover", MAIN.count("GameArtwork(item.copy(image = item.gameCoverImage ?: item.image)") >= 2),
+    ("video cards prefer cover and article detail preserves its own artwork", "GameArtwork(item.copy(image = item.gameCoverImage ?: item.image), Modifier.fillMaxSize())" in MAIN and "if (isVideoArtwork) item.copy(image = item.gameCoverImage ?: item.image) else item" in MAIN),
     ("global video search prefers the associated game cover", '"video" -> item.copy(image = item.gameCoverImage ?: item.image)' in MAIN),
     ("video detail route matches the API UUID endpoint", '"/videos/" + videoId' in MODEL and "contentDetailRoute(item, isGame" in VM),
 ]
