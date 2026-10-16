@@ -170,11 +170,11 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         "es" -> arrayOf("thumbnail_es", "thumbnailEs")
         else -> arrayOf("thumbnail_pt_br", "thumbnailPtBr")
     }
-    val image = resolveAssetUrl(o.firstText(
-        *localizedThumbnailKeys,
+    val imageKeys = localizedThumbnailKeys + arrayOf(
         "coverImage", "cover_image", "image", "thumbnail", "thumbnail_url", "thumbnailUrl",
         "heroImage", "hero_image", "bannerImage", "banner_image", "poster", "cover", "icon"
-    )) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
+    )
+    val image = resolveAssetUrl(o.firstText(*imageKeys)) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
         "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
     } else null
     val rawBody = o.firstText(
