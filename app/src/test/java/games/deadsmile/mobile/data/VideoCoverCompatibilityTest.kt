@@ -7,13 +7,13 @@ import org.junit.Test
 
 class VideoCoverCompatibilityTest {
     private val videoId = "123e4567-e89b-12d3-a456-426614174000"
-    private val thumbnail = "https://cdn.example.test/trailer-frame.jpg"
-    private val cover = "https://cdn.example.test/game-cover.jpg"
+    private val thumbnail = "https://cdn.example.com/trailer-frame.jpg"
+    private val cover = "https://cdn.example.com/game-cover.jpg"
 
     @Test fun videoThumbnailAndAssociatedGameCoverStaySeparate() {
         val video = JSONObject(
             """
-            {"items":[{"id":"$videoId","title":"Starfall Trailer","thumbnail_pt_br":"$thumbnail",
+            {"items":[{"id":"$videoId","title":"Starfall Trailer","thumbnail_pt_br":"$thumbnail","thumbnail":"$thumbnail",
               "game_cover_image":"$cover","video_url":"https://www.youtube.com/watch?v=abc123"}]}
             """.trimIndent()
         ).feed("items").single()
