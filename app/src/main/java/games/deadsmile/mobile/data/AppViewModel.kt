@@ -58,7 +58,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var posterEnrichmentJob: Job? = null
     @Volatile private var reconnectDelayMs = 1_000L
 
-    init { reload(); account() }
+    init {
+        MobileContentLanguage.update(
+            app.applicationContext.getSharedPreferences("deadsmile-ui", 0)
+                .getString("app_language", "pt-BR").orEmpty()
+        )
+        reload()
+        account()
+    }
+
+    fun setContentLanguage(language: String) {
+        MobileContentLanguage.update(language)
+        reload()
+    }
 
     fun connectRealtime() {
         if (realtimeActive) return

@@ -9,6 +9,20 @@ import org.json.JSONObject
 private const val WEBSITE_ORIGIN = "https://deadsmilegames.vercel.app"
 private const val API_ORIGIN = "https://api-ust8.onrender.com"
 
+object MobileContentLanguage {
+    @Volatile
+    var selected = "pt-BR"
+        private set
+
+    fun update(language: String) {
+        selected = when (language.lowercase(java.util.Locale.ROOT)) {
+            "en" -> "en"
+            "es" -> "es"
+            else -> "pt-BR"
+        }
+    }
+}
+
 data class FeedItem(
     val id: String,
     val title: String,
@@ -151,10 +165,16 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         .firstOrNull()?.first
     val slug = o.firstText("slug", "newsSlug", "gameSlug")
     val id = o.firstText("id", "uuid", "gameId", "game_id").ifBlank { slug.ifBlank { fallbackId } }
-    val image = resolveAssetUrl(o.firstText(
+    val localizedThumbnailKeys = when (MobileContentLanguage.selected) {
+        "en" -> arrayOf("thumbnail_en", "thumbnailEn")
+        "es" -> arrayOf("thumbnail_es", "thumbnailEs")
+        else -> arrayOf("thumbnail_pt_br", "thumbnailPtBr")
+    }
+    val imageKeys = localizedThumbnailKeys + arrayOf(
         "coverImage", "cover_image", "image", "thumbnail", "thumbnail_url", "thumbnailUrl",
         "heroImage", "hero_image", "bannerImage", "banner_image", "poster", "cover", "icon"
-    )) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
+    )
+    val image = resolveAssetUrl(o.firstText(*imageKeys)) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
         "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
     } else null
     val rawBody = o.firstText(
