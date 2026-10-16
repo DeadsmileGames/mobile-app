@@ -280,7 +280,7 @@ private fun DeadsmileApp(vm: AppViewModel = androidx.lifecycle.viewmodel.compose
                 onAppLanguage = { language ->
                     appLanguage = language
                     prefs.edit().putString("app_language", language).apply()
-                    vm.reload()
+                    vm.setContentLanguage(language)
                     vm.account()
                 }
             )
