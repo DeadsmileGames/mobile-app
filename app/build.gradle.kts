@@ -31,8 +31,8 @@ android {
         applicationId = "com.deadsmilegames.companion"
         minSdk = 26
         targetSdk = 36
-        versionCode = providers.gradleProperty("appVersionCode").orElse("1001000").get().toInt()
-        versionName = providers.gradleProperty("appVersionName").orElse("1.1.0").get()
+        versionCode = providers.gradleProperty("appVersionCode").orElse("1001001").get().toInt()
+        versionName = providers.gradleProperty("appVersionName").orElse("1.1.1").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {

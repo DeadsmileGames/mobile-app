@@ -44,7 +44,7 @@ jobs:
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
 
       - name: Build direct-install APK
-        run: gradle --no-daemon --stacktrace assembleDirectRelease -PappVersionName=1.1.0 -PappVersionCode=1001000
+        run: gradle --no-daemon --stacktrace assembleDirectRelease -PappVersionName=1.1.1 -PappVersionCode=1001001
 
       - name: Verify direct-install APK
         run: |
@@ -58,7 +58,7 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
           "$APKSIGNER" verify --print-certs "$APK"
           BADGING="$("$AAPT" dump badging "$APK")"
-          printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='1001000' versionName='1.1.0'"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='1001001' versionName='1.1.1'"
           printf '%s\n' "$BADGING" | grep -F "application-label:'Deadsmile Games'"
           printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
           printf '%s\n' "$("$AAPT" dump permissions "$APK")" | grep -F "android.permission.REQUEST_INSTALL_PACKAGES"

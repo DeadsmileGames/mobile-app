@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   direct-apk:
-    if: github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.0'))
+    if: github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.1'))
     name: Build and publish direct-install APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -41,11 +41,11 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             TAG="$GITHUB_REF_NAME"
           else
-            TAG="v1.1.0"
+            TAG="v1.1.1"
           fi
           VERSION="${TAG#v}"
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Use a version tag such as v1.1.0."
+            echo "::error::Use a version tag such as v1.1.1."
             exit 1
           fi
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
@@ -101,7 +101,7 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             TAG="$GITHUB_REF_NAME"
           else
-            TAG="v1.1.0"
+            TAG="v1.1.1"
           fi
           gh release create "$TAG" --target "$GITHUB_SHA" \
             "$APK_ASSET#Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" \

@@ -149,6 +149,8 @@ RELEASE_CHECKS = [
     ("video cards prefer cover and article detail preserves its own artwork", "GameArtwork(item.copy(image = item.gameCoverImage ?: item.image), Modifier.fillMaxSize())" in MAIN and "if (isVideoArtwork) item.copy(image = item.gameCoverImage ?: item.image) else item" in MAIN),
     ("global video search prefers the associated game cover", '"video" -> item.copy(image = item.gameCoverImage ?: item.image)' in MAIN),
     ("video detail route matches the API UUID endpoint", '"/videos/" + videoId' in MODEL and "contentDetailRoute(item, isGame" in VM),
+    ("Android patch version is aligned across Gradle and CI package verification", '"1001001"' in GRADLE and '"1.1.1"' in GRADLE and "-PappVersionName=1.1.1 -PappVersionCode=1001001" in ANDROID_WORKFLOW and "versionCode='1001001' versionName='1.1.1'" in ANDROID_WORKFLOW),
+    ("release trigger and main-branch tag agree on Android v1.1.1", "startsWith(github.event.head_commit.message, 'Release Android v1.1.1')" in RELEASE_WORKFLOW and RELEASE_WORKFLOW.count('TAG="v1.1.1"') == 2),
 ]
 
 GLOBAL_CHECKS = [
