@@ -1072,7 +1072,17 @@ private fun GameDetailsScreen(
                 }
             } else {
                 Box(Modifier.fillMaxWidth().height(230.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                    GameArtwork(item.copy(image = item.gameCoverImage ?: item.image), Modifier.fillMaxSize())
+                    val videoHost = item.url?.let { value ->
+                        runCatching { Uri.parse(value).host?.lowercase() }.getOrNull()
+                    }
+                    val isVideoArtwork = videoHost in setOf(
+                        "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+                        "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"
+                    )
+                    GameArtwork(
+                        if (isVideoArtwork) item.copy(image = item.gameCoverImage ?: item.image) else item,
+                        Modifier.fillMaxSize()
+                    )
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f)))
                     ))
