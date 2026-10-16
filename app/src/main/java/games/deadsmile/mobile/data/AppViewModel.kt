@@ -307,15 +307,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return (first + remaining.flatten()).distinctBy { it.id }.take(10_000)
     }
     fun loadDetails(item: FeedItem, isGame: Boolean) = viewModelScope.launch {
+        val knownVideoIds = mutable.value.videos.map { it.id.lowercase() }.toSet()
+        val route = contentDetailRoute(item, isGame, knownVideoIds)
         mutable.value = mutable.value.copy(detail = item, detailLoading = true)
-        val slug = item.slug.trim()
-        if (!slug.matches(Regex("[A-Za-z0-9-]{1,160}"))) {
+        if (route == null) {
             mutable.value = mutable.value.copy(detailLoading = false)
             return@launch
         }
         val loaded = withContext(Dispatchers.IO) {
             runCatching {
-                val route = if (isGame) "/games/" + slug else "/newswire/" + slug
                 api.get(route).detailItem(item, preferGame = isGame)
             }.getOrNull()
         }

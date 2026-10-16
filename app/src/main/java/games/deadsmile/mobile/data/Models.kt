@@ -6,7 +6,7 @@ import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val WEBSITE_ORIGIN = "https://deadsmilegames.vercel.app"
+private const val WEBSITE_ORIGIN = "https://deadsmilegames.onrender.com"
 private const val API_ORIGIN = "https://api-ust8.onrender.com"
 
 object MobileContentLanguage {
@@ -63,8 +63,27 @@ data class FeedItem(
     val savePathTemplate: String = "",
     val cloudSavesEnabled: Boolean = false,
     val supportedLanguages: List<String> = emptyList(),
-    val features: List<String> = emptyList()
+    val features: List<String> = emptyList(),
+    val gameCoverImage: String? = null
 )
+
+/**
+ * Resolves detail links against the API contract. Videos are keyed by UUID,
+ * whereas games and newswire articles use slugs.
+ */
+internal fun contentDetailRoute(item: FeedItem, isGame: Boolean, knownVideoIds: Set<String>): String? {
+    val slug = item.slug.trim().lowercase()
+    if (isGame) {
+        return slug.takeIf { Regex("^[a-z0-9-]{1,160}$").matches(it) }?.let { "/games/" + it }
+    }
+    if (knownVideoIds.any { it.equals(item.id, ignoreCase = true) }) {
+        val videoId = item.id.trim()
+        return videoId.takeIf { Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(it) }
+            ?.let { "/videos/" + videoId }
+    }
+    return slug.takeIf { Regex("^[a-z0-9-]{1,160}$").matches(it) }?.let { "/newswire/" + it }
+}
+
 
 data class UserAccount(val id: String, val username: String, val email: String, val bio: String)
 
@@ -177,6 +196,8 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
     val image = resolveAssetUrl(o.firstText(*imageKeys)) ?: if (title.contains("abby", ignoreCase = true) && title.contains("restless", ignoreCase = true)) {
         "https://img.itch.zone/aW1nLzMwMzI2OTk4LnBuZw==/original/yJfbvV.png"
     } else null
+    // Keep the video's own thumbnail separate from the associated game's cover.
+    val gameCoverImage = resolveAssetUrl(o.firstText("game_cover_image", "gameCoverImage"))
     val rawBody = o.firstText(
         "body", "content", "contentHtml", "content_html", "html", "articleBody",
         "article_body", "fullDescription", "full_description", "description", "excerpt"
@@ -314,7 +335,8 @@ private fun itemFromJson(o: JSONObject, fallbackId: String, includeRelated: Bool
         savePathTemplate = o.firstText("savePathTemplate", "save_path_template"),
         cloudSavesEnabled = o.optBoolean("cloudSavesEnabled", o.optBoolean("cloud_saves_enabled", false)),
         supportedLanguages = (o.optJSONArray("supportedLanguages") ?: o.optJSONArray("supported_languages") ?: o.optJSONArray("languages") ?: JSONArray()).strings(),
-        features = (o.optJSONArray("features") ?: o.optJSONArray("gameModes") ?: o.optJSONArray("game_modes") ?: JSONArray()).strings()
+        features = (o.optJSONArray("features") ?: o.optJSONArray("gameModes") ?: o.optJSONArray("game_modes") ?: JSONArray()).strings(),
+        gameCoverImage = gameCoverImage
     )
 }
 
@@ -349,6 +371,7 @@ fun JSONObject.detailItem(fallback: FeedItem, preferGame: Boolean? = null): Feed
         title = parsed.title.ifBlank { fallback.title },
         slug = parsed.slug.ifBlank { fallback.slug },
         image = parsed.image ?: fallback.image,
+        gameCoverImage = parsed.gameCoverImage ?: fallback.gameCoverImage,
         summary = parsed.summary.ifBlank { fallback.summary },
         body = parsed.body.ifBlank { fallback.body },
         url = parsed.url ?: fallback.url,

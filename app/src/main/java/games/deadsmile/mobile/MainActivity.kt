@@ -609,7 +609,7 @@ private fun DeadsmileRoot(
                             else vm.toggleWishlist(displayItem)
                         },
                         onRelated = { related -> detailItem = related; detailIsGame = true },
-                        onOpenSite = { openExternal(context, "https://deadsmilegames.vercel.app") },
+                        onOpenSite = { openExternal(context, "https://deadsmilegames.onrender.com") },
                         onOpenExternal = { url -> openExternal(context, url) }
                     )
                 } ?: Home(state, pad, { page = Page.NEWS }, { page = Page.VIDEOS }, {}, {}, { page = Page.GAMES })
@@ -949,7 +949,7 @@ private fun VideoThumbnailCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-            GameArtwork(item, Modifier.fillMaxSize())
+            GameArtwork(item.copy(image = item.gameCoverImage ?: item.image), Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(
                 androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .78f)))
             ))
@@ -1072,7 +1072,7 @@ private fun GameDetailsScreen(
                 }
             } else {
                 Box(Modifier.fillMaxWidth().height(230.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                    GameArtwork(item, Modifier.fillMaxSize())
+                    GameArtwork(item.copy(image = item.gameCoverImage ?: item.image), Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, BrandInk.copy(alpha = 0.78f)))
                     ))
@@ -1733,7 +1733,7 @@ private fun AccountScreen(state: UiState, pad: PaddingValues, vm: AppViewModel, 
                         TextButton(onClick = { registerMode = !registerMode }, modifier = Modifier.fillMaxWidth()) {
                             Text(if (registerMode) "Já tenho uma conta" else "Criar uma conta")
                         }
-                        TextButton(onClick = { openExternal(context, "https://deadsmilegames.vercel.app") }, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { openExternal(context, "https://deadsmilegames.onrender.com") }, modifier = Modifier.fillMaxWidth()) {
                             Text("Precisa de ajuda com a conta?")
                         }
                     }
@@ -2122,7 +2122,11 @@ private fun GlobalSearchScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                             ) {
-                                val artwork = if (kind == "game" && !item.posterImage.isNullOrBlank()) item.copy(image = item.posterImage) else item
+                                val artwork = when (kind) {
+                                    "game" -> if (!item.posterImage.isNullOrBlank()) item.copy(image = item.posterImage) else item
+                                    "video" -> item.copy(image = item.gameCoverImage ?: item.image)
+                                    else -> item
+                                }
                                 GameArtwork(artwork, Modifier.fillMaxSize())
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

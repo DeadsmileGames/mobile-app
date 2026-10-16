@@ -143,6 +143,12 @@ RELEASE_CHECKS = [
     ("logout closes the authenticated socket", "restartRealtimeForSessionChange()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
     ("logout clears cached private preferences", "privacy = PrivacyOptions()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
     ("release tag points at the tested commit", 'gh release create "$TAG" --target "$GITHUB_SHA"' in RELEASE_WORKFLOW),
+    ("website links use the canonical Render host", '"https://deadsmilegames.onrender.com"' in MODEL and "deadsmilegames.vercel.app" not in MAIN),
+    ("mobile API client retains the configured API host", "https://api-ust8.onrender.com/api" in API),
+    ("video game cover maps separately from the video thumbnail", all(token in MODEL for token in ("gameCoverImage: String?", '"game_cover_image"', "gameCoverImage = gameCoverImage"))),
+    ("video cards and detail artwork prefer the game cover", MAIN.count("GameArtwork(item.copy(image = item.gameCoverImage ?: item.image)") >= 2),
+    ("global video search prefers the associated game cover", '"video" -> item.copy(image = item.gameCoverImage ?: item.image)' in MAIN),
+    ("video detail route matches the API UUID endpoint", '"/videos/" + videoId' in MODEL and "contentDetailRoute(item, isGame" in VM),
 ]
 
 GLOBAL_CHECKS = [
