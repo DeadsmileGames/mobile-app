@@ -5,6 +5,8 @@ import java.util.Locale
 
 object AppI18n {
     private val english = mapOf(
+        "Não foi possível carregar os pré-registros agora. Tente novamente." to "Pre-registrations could not be loaded right now. Please try again.",
+        "Tentar novamente" to "Try again",
         "Confira os dados do pré-registro." to "Check the pre-registration details.",
         "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição." to "Pre-registration submitted. Check your email to confirm.",
         "Enviar pré-registro" to "Submit pre-registration",
@@ -398,6 +400,8 @@ object AppI18n {
     )
 
     private val spanish = mapOf(
+        "Não foi possível carregar os pré-registros agora. Tente novamente." to "No se pudieron cargar las preinscripciones. Inténtalo de nuevo.",
+        "Tentar novamente" to "Intentar de nuevo",
         "Confira os dados do pré-registro." to "Revisa los datos de la preinscripción.",
         "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição." to "Preinscripción enviada. Revisa tu correo para confirmar.",
         "Enviar pré-registro" to "Enviar preinscripción",
