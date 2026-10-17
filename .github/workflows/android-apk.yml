@@ -44,7 +44,7 @@ jobs:
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
 
       - name: Build direct-install APK
-        run: gradle --no-daemon --stacktrace assembleDirectRelease -PappVersionName=1.1.1 -PappVersionCode=1001001
+        run: gradle --no-daemon --stacktrace assembleDirectRelease -PappVersionName=1.1.1 -PappVersionCode=1001001 -PallowDebugSigningForCi=true
 
       - name: Verify direct-install APK
         run: |

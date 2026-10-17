@@ -12,6 +12,7 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
     !releaseStorePassword.isNullOrBlank() &&
     !releaseKeyAlias.isNullOrBlank() &&
     !releaseKeyPassword.isNullOrBlank()
+val allowDebugSigningForCi = providers.gradleProperty("allowDebugSigningForCi").orNull == "true"
 
 android {
     namespace = "games.deadsmile.mobile"
@@ -51,10 +52,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = if (releaseSigningConfigured) {
-                signingConfigs.getByName("githubRelease")
-            } else {
-                signingConfigs.getByName("debug")
+            signingConfig = when {
+                releaseSigningConfigured -> signingConfigs.getByName("githubRelease")
+                allowDebugSigningForCi -> signingConfigs.getByName("debug")
+                else -> null
             }
         }
     }
