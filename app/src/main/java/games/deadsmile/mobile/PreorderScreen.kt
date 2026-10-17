@@ -31,8 +31,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import games.deadsmile.mobile.data.PreorderOption
 import games.deadsmile.mobile.data.UiState
@@ -122,7 +120,7 @@ internal fun PreorderScreen(
                         Button(
                             onClick = { onRegister(game.slug, firstName, lastName, age, email) },
                             enabled = !state.busy && firstName.isNotBlank() && lastName.isNotBlank() &&
-                                age.toIntOrNull() in 1..120 && email.contains("@"),
+                                age.toIntOrNull()?.let { it in 1..120 } == true && email.contains("@"),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

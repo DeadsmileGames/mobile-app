@@ -1,6 +1,7 @@
 package games.deadsmile.mobile.data
 
 import android.content.Context
+import games.deadsmile.mobile.BuildConfig
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import okhttp3.Cookie
@@ -164,7 +165,7 @@ class ApiClient(context: Context) {
         val selectedLanguage = appContext.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE)
             .getString("app_language", "").orEmpty()
         val builder = Request.Builder().url(BASE + path).header("Accept", "application/json")
-            .header("User-Agent", "DeadsmileGamesCompanion/1.1.0")
+            .header("User-Agent", "DeadsmileGamesCompanion/" + BuildConfig.VERSION_NAME)
         when (selectedLanguage.lowercase(java.util.Locale.ROOT)) {
             "pt-br", "pt" -> builder.header("Accept-Language", "pt-BR")
             "en" -> builder.header("Accept-Language", "en")

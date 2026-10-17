@@ -544,8 +544,8 @@ private fun DeadsmileRoot(
                 Page.PREREGISTER -> PreorderScreen(
                     state = state,
                     pad = pad,
-                    onRefresh = vm::loadPreorders,
-                    onRegister = vm::registerPreorder,
+                    onRefresh = { vm.loadPreorders() },
+                    onRegister = { slug, firstName, lastName, age, email -> vm.registerPreorder(slug, firstName, lastName, age, email) },
                     onSignIn = { returnPage = Page.PREREGISTER; page = Page.ACCOUNT }
                 )
                 Page.SEARCH -> GlobalSearchScreen(state, pad) { item, isGame ->
