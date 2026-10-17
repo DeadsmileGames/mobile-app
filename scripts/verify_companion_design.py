@@ -139,6 +139,8 @@ LOCALIZED_UI_KEYS = (
     "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição.",
     "Confira os dados do pré-registro.",
     "Entre na sua conta para continuar.",
+    "Tentar novamente",
+    "Não foi possível carregar os pré-registros agora. Tente novamente.",
 )
 
 RELEASE_CHECKS = [
