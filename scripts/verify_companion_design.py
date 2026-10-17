@@ -138,7 +138,7 @@ RELEASE_CHECKS = [
     ("CI verifies the direct APK package and permissions", "REQUEST_INSTALL_PACKAGES" in ANDROID_WORKFLOW and "verify --verbose" in ANDROID_WORKFLOW),
     ("release workflow builds only the direct APK", "assembleDirectRelease" in RELEASE_WORKFLOW and "bundlePlayRelease" not in RELEASE_WORKFLOW and ".aab" not in RELEASE_WORKFLOW),
     ("release workflow validates package and target API", "com.deadsmilegames.companion" in RELEASE_WORKFLOW and "targetSdkVersion:'36'" in RELEASE_WORKFLOW),
-    ("release signing is private-key based by default and debug signing is test-only", 'signingConfig = when' in GRADLE and 'providers.gradleProperty("allowDebugSigningForCi")' in GRADLE and 'allowDebugSigningForCi -> signingConfigs.getByName("debug")' in GRADLE and 'signingConfig = null' in GRADLE and "ANDROID_RELEASE_KEYSTORE_BASE64" in RELEASE_WORKFLOW and "allowDebugSigningForCi" not in RELEASE_WORKFLOW),
+    ("release signing is private-key based by default and debug signing is test-only", 'signingConfig = when' in GRADLE and 'providers.gradleProperty("allowDebugSigningForCi")' in GRADLE and 'allowDebugSigningForCi -> signingConfigs.getByName("debug")' in GRADLE and 'else -> null' in GRADLE and "ANDROID_RELEASE_KEYSTORE_BASE64" in RELEASE_WORKFLOW and "allowDebugSigningForCi" not in RELEASE_WORKFLOW),
     ("release workflow publishes one APK asset", "APK_ASSET#Deadsmile-Games-Android-v" in RELEASE_WORKFLOW and "SHA256SUMS.txt" not in RELEASE_WORKFLOW),
     ("logout closes the authenticated socket", "restartRealtimeForSessionChange()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
     ("logout clears cached private preferences", "privacy = PrivacyOptions()" in VM[VM.index("fun logout()"):VM.index("fun dismiss()")]),
