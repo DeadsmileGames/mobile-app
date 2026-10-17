@@ -63,6 +63,29 @@ jobs:
           printf 'APP_VERSION_NAME=%s\n' "$VERSION" >> "$GITHUB_ENV"
           printf 'APP_VERSION_CODE=%s\n' "$VERSION_CODE" >> "$GITHUB_ENV"
 
+      - name: Prepare persistent release signing key
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEYSTORE_PATH: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PATH }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" ]]; then
+            printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/deadsmile-release.keystore"
+            test -s "$RUNNER_TEMP/deadsmile-release.keystore"
+            printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$RUNNER_TEMP/deadsmile-release.keystore" >> "$GITHUB_ENV"
+          elif [[ -n "${ANDROID_RELEASE_KEYSTORE_PATH:-}" && -f "$ANDROID_RELEASE_KEYSTORE_PATH" ]]; then
+            printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$ANDROID_RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
+          else
+            echo "::error::Configure ANDROID_RELEASE_KEYSTORE_BASE64 (recommended) or a valid ANDROID_RELEASE_KEYSTORE_PATH before publishing an Android release."
+            exit 1
+          fi
+          test -n "${ANDROID_RELEASE_STORE_PASSWORD:-}"
+          test -n "${ANDROID_RELEASE_KEY_ALIAS:-}"
+          test -n "${ANDROID_RELEASE_KEY_PASSWORD:-}"
+
       - name: Run unit tests
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
 

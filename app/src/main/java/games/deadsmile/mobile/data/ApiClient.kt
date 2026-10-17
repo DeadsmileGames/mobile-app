@@ -76,7 +76,7 @@ class ApiClient(context: Context) {
     fun patch(path: String, body: JSONObject) = request("PATCH", path, body)
     fun put(path: String, body: JSONObject) = request("PUT", path, body)
     fun delete(path: String, body: JSONObject? = null) = request("DELETE", path, body)
-    fun clearSession() { prefs.edit().remove("cookies").apply(); csrf = null }
+    fun clearSession() { prefs.edit().remove("cookies").remove("access_token").apply(); csrf = null }
 
     @Synchronized private fun token(force: Boolean = false): String {
         if (!force) csrf?.let { return it }
@@ -88,14 +88,79 @@ class ApiClient(context: Context) {
     private fun request(method: String, path: String, body: JSONObject? = null): JSONObject {
         require(path.startsWith("/") && !path.startsWith("//") && !path.contains("..") && !path.contains('#'))
         val csrfHeader = if (method in setOf("POST", "PUT", "PATCH", "DELETE")) token() else null
-        return try { execute(method, path, body, csrfHeader) }
-        catch (e: ApiFailure) {
-            if (e.status == 403 && e.code == "CSRF_VALIDATION_FAILED" && csrfHeader != null)
-                execute(method, path, body, token(force = true))
-            else throw e
+        val tokenEndpoint = path == "/auth/mobile-token"
+        val sessionEstablishing = path in setOf("/auth/mobile-login", "/auth/mobile-register", "/auth/verify-2fa")
+        if (!tokenEndpoint && !sessionEstablishing) runCatching { refreshAccessTokenIfNeeded(false) }
+        val bearer = if (tokenEndpoint) null else prefs.getString("access_token", null)
+        return try {
+            val result = try {
+                execute(method, path, body, csrfHeader, bearer)
+            } catch (e: ApiFailure) {
+                if (e.status == 403 && e.code == "CSRF_VALIDATION_FAILED" && csrfHeader != null) {
+                    execute(method, path, body, token(force = true), bearer)
+                } else {
+                    throw e
+                }
+            }
+            if ((path == "/auth/mobile-login" && !result.optBoolean("requiresTwoFactor")) || path == "/auth/verify-2fa") {
+                runCatching { refreshAccessTokenIfNeeded(true) }
+            }
+            result
+        } catch (e: ApiFailure) {
+            if (bearer != null && e.status == 401 && e.code in setOf("ACCESS_TOKEN_EXPIRED", "INVALID_ACCESS_TOKEN", "SESSION_EXPIRED")) {
+                prefs.edit().remove("access_token").apply()
+                runCatching { refreshAccessTokenIfNeeded(true) }
+                val renewed = prefs.getString("access_token", null)
+                if (!renewed.isNullOrBlank()) execute(method, path, body, csrfHeader, renewed) else throw e
+            } else {
+                throw e
+            }
         }
     }
-    private fun execute(method: String, path: String, body: JSONObject?, token: String?): JSONObject {
+    private fun refreshAccessTokenIfNeeded(force: Boolean) {
+        val existing = prefs.getString("access_token", null)
+        val expiration = existing?.let(::tokenExpirationMillis)
+        if (!force && expiration != null && expiration > System.currentTimeMillis() + 60_000L) return
+        if (!hasSessionCookie()) {
+            if (expiration == null || expiration <= System.currentTimeMillis()) prefs.edit().remove("access_token").apply()
+            return
+        }
+        val csrfHeader = token(force = force)
+        val response = try {
+            execute("POST", "/auth/mobile-token", JSONObject(), csrfHeader, null)
+        } catch (error: ApiFailure) {
+            if (error.status == 403 && error.code == "CSRF_VALIDATION_FAILED") {
+                execute("POST", "/auth/mobile-token", JSONObject(), token(force = true), null)
+            } else {
+                throw error
+            }
+        }
+        val fresh = response.optString("accessToken").takeIf { it.isNotBlank() && it.length <= 4096 }
+            ?: throw ApiFailure(0, "INVALID_ACCESS_TOKEN", "Não foi possível renovar a sessão.")
+        prefs.edit().putString("access_token", fresh).apply()
+    }
+    private fun hasSessionCookie(): Boolean {
+        val cookies = runCatching { JSONArray(prefs.getString("cookies", "[]")) }.getOrDefault(JSONArray())
+        val now = System.currentTimeMillis()
+        for (i in 0 until cookies.length()) {
+            val item = cookies.optJSONObject(i) ?: continue
+            if (item.optString("name") == "deadsmile.sid" &&
+                item.optString("domain") == HOST &&
+                item.optLong("expiresAt", 0L) > now &&
+                item.optString("value").isNotBlank()
+            ) return true
+        }
+        return false
+    }
+    private fun tokenExpirationMillis(token: String): Long? {
+        val parts = token.split('.')
+        if (parts.size != 3) return null
+        return runCatching {
+            val payload = JSONObject(String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)))
+            payload.optLong("exp").takeIf { it > 0 }?.times(1000L)
+        }.getOrNull()
+    }
+    private fun execute(method: String, path: String, body: JSONObject?, token: String?, bearer: String? = null): JSONObject {
         val selectedLanguage = appContext.getSharedPreferences("deadsmile-ui", Context.MODE_PRIVATE)
             .getString("app_language", "").orEmpty()
         val builder = Request.Builder().url(BASE + path).header("Accept", "application/json")
@@ -106,6 +171,7 @@ class ApiClient(context: Context) {
             "es" -> builder.header("Accept-Language", "es")
         }
         if (token != null) builder.header("X-CSRF-Token", token)
+        if (!bearer.isNullOrBlank()) builder.header("Authorization", "Bearer " + bearer)
         builder.method(method, if (body != null) body.toString().toRequestBody(JSON) else null)
         client.newCall(builder.build()).execute().use { response ->
             val raw = response.body?.string().orEmpty()

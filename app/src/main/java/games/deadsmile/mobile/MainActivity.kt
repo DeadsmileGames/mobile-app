@@ -67,6 +67,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.VideogameAsset
@@ -122,7 +123,7 @@ import java.util.concurrent.TimeUnit
 private enum class Page(val label: String) {
     HOME("Início"), GAMES("Jogos"), NEWS("Newswire"), VIDEOS("Vídeos"), LIBRARY("Biblioteca"),
     ACCOUNT("Conta"), WISHLIST("Lista de desejos"), SETTINGS("Configurações"), DETAILS("Detalhes"), UPDATES("Atualizações"),
-    NOTIFICATIONS("Notificações"), SEARCH("Busca global")
+    NOTIFICATIONS("Notificações"), SEARCH("Busca global"), PREREGISTER("Pré-registro")
 }
 
 private val BrandInk = Color(0xFF101010)
@@ -416,7 +417,7 @@ private fun DeadsmileRoot(
 
     BackHandler(enabled = page != Page.HOME && tourStage < 0) {
         page = when (page) {
-            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS, Page.SEARCH -> returnPage.takeIf { it != page } ?: Page.HOME
+            Page.SETTINGS, Page.DETAILS, Page.WISHLIST, Page.UPDATES, Page.NOTIFICATIONS, Page.SEARCH, Page.PREREGISTER -> returnPage.takeIf { it != page } ?: Page.HOME
             else -> Page.HOME
         }
     }
@@ -446,24 +447,25 @@ private fun DeadsmileRoot(
                             Page.UPDATES -> "Atualizações"
                             Page.NOTIFICATIONS -> "Notificações"
                             Page.SEARCH -> "Busca global"
+                            Page.PREREGISTER -> "Pré-registro"
                         }
                         Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 },
                 navigationIcon = {
-                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS || page == Page.SEARCH) {
+                    if (page == Page.DETAILS || page == Page.SETTINGS || page == Page.WISHLIST || page == Page.GAMES || page == Page.UPDATES || page == Page.NOTIFICATIONS || page == Page.SEARCH || page == Page.PREREGISTER) {
                         IconButton(onClick = { page = when (page) { Page.GAMES -> Page.HOME; else -> returnPage.takeIf { it != page } ?: Page.HOME } }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppI18n.translate(LocalContext.current, "Voltar"))
                         }
                     }
                 },
                 actions = {
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.PREREGISTER) {
                         IconButton(onClick = { returnPage = page; page = Page.SEARCH }) {
                             Icon(Icons.Outlined.Search, contentDescription = AppI18n.translate(LocalContext.current, "Buscar em todo o app"))
                         }
                     }
-                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
+                    if (tourStage < 0 && page != Page.SETTINGS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH && page != Page.PREREGISTER) {
                         IconButton(onClick = { returnPage = page; page = Page.SETTINGS }) {
                             Icon(Icons.Outlined.Settings, contentDescription = AppI18n.translate(LocalContext.current, "Configurações"))
                         }
@@ -471,6 +473,11 @@ private fun DeadsmileRoot(
                     if (tourStage < 0 && page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
                         IconButton(onClick = { returnPage = page; page = Page.NOTIFICATIONS }) {
                             Icon(Icons.Outlined.Notifications, contentDescription = AppI18n.translate(LocalContext.current, "Notificações"))
+                        }
+                    }
+                    if (tourStage < 0 && page != Page.PREREGISTER && page != Page.SETTINGS && page != Page.SEARCH && page != Page.UPDATES && page != Page.NOTIFICATIONS) {
+                        IconButton(onClick = { returnPage = page; page = Page.PREREGISTER }) {
+                            Icon(Icons.Outlined.EventAvailable, contentDescription = AppI18n.translate(LocalContext.current, "Pré-registro"))
                         }
                     }
                     if (tourStage < 0 && page != Page.NOTIFICATIONS && page != Page.SEARCH) {
@@ -487,7 +494,7 @@ private fun DeadsmileRoot(
             )
         },
         bottomBar = {
-            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH && tourStage != 6) {
+            if (page != Page.SETTINGS && page != Page.DETAILS && page != Page.WISHLIST && page != Page.UPDATES && page != Page.NOTIFICATIONS && page != Page.SEARCH && page != Page.PREREGISTER && tourStage != 6) {
                 val tourTarget = if (tourStage in 1..5) tourTargets.getOrNull(tourStage - 1) else null
                 FloatingDock(
                     page = page,
@@ -534,6 +541,13 @@ private fun DeadsmileRoot(
             label = "deadsmile-page"
         ) { targetPage ->
             when (targetPage) {
+                Page.PREREGISTER -> PreorderScreen(
+                    state = state,
+                    pad = pad,
+                    onRefresh = vm::loadPreorders,
+                    onRegister = vm::registerPreorder,
+                    onSignIn = { returnPage = Page.PREREGISTER; page = Page.ACCOUNT }
+                )
                 Page.SEARCH -> GlobalSearchScreen(state, pad) { item, isGame ->
                     detailItem = item
                     detailIsGame = isGame

@@ -23,7 +23,10 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 
+data class PreorderOption(val id: String, val slug: String, val title: String, val coverImage: String?, val startsAt: String, val endsAt: String)
+
 data class UiState(
+    val preorders: List<PreorderOption> = emptyList(),
     val news: List<FeedItem> = emptyList(), val videos: List<FeedItem> = emptyList(),
     val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(), val wishlist: List<FeedItem> = emptyList(),
     val user: UserAccount? = null, val loading: Boolean = true, val busy: Boolean = false,
@@ -65,6 +68,56 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         reload()
         account()
+        loadPreorders()
+    }
+
+    fun loadPreorders() = viewModelScope.launch {
+        val response = withContext(Dispatchers.IO) {
+            runCatching { api.get("/preorders") }.getOrNull()
+        }
+        val array = response?.optJSONArray("items")
+        val items = if (array == null) emptyList() else (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            val slug = item.optString("slug")
+            val title = item.optString("title")
+            if (!Regex("^[a-z0-9-]{2,120}$").matches(slug) || title.isBlank()) return@mapNotNull null
+            PreorderOption(
+                id = item.optString("id", slug),
+                slug = slug,
+                title = title,
+                coverImage = item.optString("coverImage").takeIf { it.startsWith("https://") },
+                startsAt = item.optString("startsAt"),
+                endsAt = item.optString("endsAt"),
+            )
+        }
+        mutable.value = mutable.value.copy(preorders = items)
+    }
+
+    fun registerPreorder(slug: String, firstName: String, lastName: String, age: String, email: String) = viewModelScope.launch {
+        val years = age.toIntOrNull()
+        if (firstName.trim().isEmpty() || lastName.trim().isEmpty() || years == null || years !in 1..120 || !email.trim().contains("@")) {
+            mutable.value = mutable.value.copy(error = "Confira os dados do pré-registro.")
+            return@launch
+        }
+        if (mutable.value.user == null) {
+            mutable.value = mutable.value.copy(error = "Entre na sua conta para continuar.")
+            return@launch
+        }
+        mutable.value = mutable.value.copy(busy = true, error = null, message = null)
+        try {
+            val body = JSONObject()
+                .put("firstName", firstName.trim())
+                .put("lastName", lastName.trim())
+                .put("age", years)
+                .put("email", email.trim())
+                .put("locale", MobileContentLanguage.selected)
+            withContext(Dispatchers.IO) { api.post("/preorders/" + slug, body) }
+            mutable.value = mutable.value.copy(message = "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição.")
+        } catch (error: Exception) {
+            mutable.value = mutable.value.copy(error = safe(error))
+        } finally {
+            mutable.value = mutable.value.copy(busy = false)
+        }
     }
 
     fun setContentLanguage(language: String) {
