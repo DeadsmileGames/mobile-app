@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import coil.compose.AsyncImage
@@ -43,6 +44,8 @@ internal fun PreorderScreen(
     onRegister: (String, String, String, String, String) -> Unit,
     onSignIn: () -> Unit
 ) {
+    val context = LocalContext.current
+    val t: (String) -> String = { AppI18n.translate(context, it) }
     var selectedSlug by rememberSaveable { mutableStateOf("") }
     var firstName by rememberSaveable { mutableStateOf("") }
     var lastName by rememberSaveable { mutableStateOf("") }
@@ -59,17 +62,17 @@ internal fun PreorderScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("Pré-registro", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Veja os jogos com inscrições abertas e receba a confirmação por e-mail.")
+            Text(t("Pré-registro"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(t("Veja os jogos com inscrições abertas e receba a confirmação por e-mail."))
             Spacer(Modifier.height(4.dp))
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text("Atualizar inscrições") }
+            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(t("Atualizar inscrições")) }
         }
         if (state.preorders.isEmpty()) {
             item {
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Nenhum pré-registro aberto", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Quando um jogo abrir as inscrições, ele aparecerá aqui automaticamente.")
+                        Text(t("Nenhum pré-registro aberto"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(t("Quando um jogo abrir as inscrições, ele aparecerá aqui automaticamente."))
                     }
                 }
             }
@@ -86,7 +89,7 @@ internal fun PreorderScreen(
                         )
                     }
                     Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Inscrições abertas")
+                    Text(t("Inscrições abertas"))
                     if (selectedSlug != game.slug) {
                         Button(onClick = {
                             selectedSlug = game.slug
@@ -94,29 +97,29 @@ internal fun PreorderScreen(
                             lastName = ""
                             age = ""
                             email = state.user?.email.orEmpty()
-                        }, modifier = Modifier.fillMaxWidth()) { Text("Fazer pré-registro") }
+                        }, modifier = Modifier.fillMaxWidth()) { Text(t("Fazer pré-registro")) }
                     } else if (state.user == null) {
-                        Text("Entre na sua conta para continuar com a inscrição.")
-                        Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text("Entrar na conta") }
-                        OutlinedButton(onClick = { selectedSlug = "" }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
+                        Text(t("Entre na sua conta para continuar com a inscrição."))
+                        Button(onClick = onSignIn, modifier = Modifier.fillMaxWidth()) { Text(t("Entrar na conta")) }
+                        OutlinedButton(onClick = { selectedSlug = "" }, modifier = Modifier.fillMaxWidth()) { Text(t("Cancelar")) }
                     } else {
                         OutlinedTextField(
                             value = firstName, onValueChange = { firstName = it.take(100) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text("Nome") }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("Nome")) }, singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName, onValueChange = { lastName = it.take(100) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text("Sobrenome") }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("Sobrenome")) }, singleLine = true
                         )
                         OutlinedTextField(
                             value = age, onValueChange = { value -> if (value.all(Char::isDigit)) age = value.take(3) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text("Idade") }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("Idade")) }, singleLine = true
                         )
                         OutlinedTextField(
                             value = email, onValueChange = { email = it.take(254) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text("E-mail para confirmação") }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("E-mail para confirmação")) }, singleLine = true
                         )
-                        Text("O e-mail será usado para confirmar a inscrição. Confira os dados antes de enviar.", style = MaterialTheme.typography.bodySmall)
+                        Text(t("O e-mail será usado para confirmar a inscrição. Confira os dados antes de enviar."), style = MaterialTheme.typography.bodySmall)
                         Button(
                             onClick = { onRegister(game.slug, firstName, lastName, age, email) },
                             enabled = !state.busy && firstName.isNotBlank() && lastName.isNotBlank() &&
@@ -124,9 +127,9 @@ internal fun PreorderScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            else Text("Enviar pré-registro")
+                            else Text(t("Enviar pré-registro"))
                         }
-                        OutlinedButton(onClick = { selectedSlug = "" }, modifier = Modifier.fillMaxWidth()) { Text("Cancelar") }
+                        OutlinedButton(onClick = { selectedSlug = "" }, modifier = Modifier.fillMaxWidth()) { Text(t("Cancelar")) }
                     }
                 }
             }
