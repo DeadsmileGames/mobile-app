@@ -27,6 +27,12 @@ data class PreorderOption(val id: String, val slug: String, val title: String, v
 
 data class UiState(
     val preorders: List<PreorderOption> = emptyList(),
+    val preorderLoading: Boolean = false,
+    val preorderLoadError: String? = null,
+    val preorderMessage: String? = null,
+    val preorderMessageSlug: String? = null,
+    val preorderError: String? = null,
+    val preorderErrorSlug: String? = null,
     val news: List<FeedItem> = emptyList(), val videos: List<FeedItem> = emptyList(),
     val games: List<FeedItem> = emptyList(), val library: List<FeedItem> = emptyList(), val wishlist: List<FeedItem> = emptyList(),
     val user: UserAccount? = null, val loading: Boolean = true, val busy: Boolean = false,
@@ -72,11 +78,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadPreorders() = viewModelScope.launch {
-        val response = withContext(Dispatchers.IO) {
-            runCatching { api.get("/preorders") }.getOrNull()
+        mutable.value = mutable.value.copy(preorderLoading = true, preorderLoadError = null)
+        val outcome = withContext(Dispatchers.IO) {
+            runCatching { api.get("/preorders") }
         }
-        val array = response?.optJSONArray("items")
-        val items = if (array == null) emptyList() else (0 until array.length()).mapNotNull { index ->
+        val response = outcome.getOrNull()
+        if (response == null) {
+            mutable.value = mutable.value.copy(
+                preorderLoading = false,
+                preorderLoadError = safe(outcome.exceptionOrNull() ?: IllegalStateException("Pre-registration could not be loaded.")),
+            )
+            return@launch
+        }
+        val array = response.optJSONArray("items")
+        if (array == null) {
+            mutable.value = mutable.value.copy(
+                preorderLoading = false,
+                preorderLoadError = "Não foi possível carregar os pré-registros agora. Tente novamente.",
+            )
+            return@launch
+        }
+        val items = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
             val slug = item.optString("slug")
             val title = item.optString("title")
@@ -90,20 +112,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 endsAt = item.optString("endsAt"),
             )
         }
-        mutable.value = mutable.value.copy(preorders = items)
+        mutable.value = mutable.value.copy(
+            preorders = items,
+            preorderLoading = false,
+            preorderLoadError = null,
+        )
     }
 
     fun registerPreorder(slug: String, firstName: String, lastName: String, age: String, email: String) = viewModelScope.launch {
         val years = age.toIntOrNull()
-        if (firstName.trim().isEmpty() || lastName.trim().isEmpty() || years == null || years !in 1..120 || !email.trim().contains("@")) {
-            mutable.value = mutable.value.copy(error = "Confira os dados do pré-registro.")
+        if (
+            firstName.trim().isEmpty() ||
+            lastName.trim().isEmpty() ||
+            years == null ||
+            years !in 1..120 ||
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+        ) {
+            mutable.value = mutable.value.copy(
+                preorderError = "Confira os dados do pré-registro.",
+                preorderErrorSlug = slug,
+                preorderMessage = null,
+                preorderMessageSlug = null,
+            )
             return@launch
         }
         if (mutable.value.user == null) {
-            mutable.value = mutable.value.copy(error = "Entre na sua conta para continuar.")
+            mutable.value = mutable.value.copy(
+                preorderError = "Entre na sua conta para continuar.",
+                preorderErrorSlug = slug,
+                preorderMessage = null,
+                preorderMessageSlug = null,
+            )
             return@launch
         }
-        mutable.value = mutable.value.copy(busy = true, error = null, message = null)
+        mutable.value = mutable.value.copy(
+            busy = true,
+            preorderError = null,
+            preorderErrorSlug = null,
+            preorderMessage = null,
+            preorderMessageSlug = null,
+        )
         try {
             val body = JSONObject()
                 .put("firstName", firstName.trim())
@@ -112,9 +160,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .put("email", email.trim())
                 .put("locale", MobileContentLanguage.selected)
             withContext(Dispatchers.IO) { api.post("/preorders/" + slug, body) }
-            mutable.value = mutable.value.copy(message = "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição.")
+            mutable.value = mutable.value.copy(
+                preorderMessage = "Pré-registro enviado. Confira seu e-mail para confirmar a inscrição.",
+                preorderMessageSlug = slug,
+                preorderError = null,
+                preorderErrorSlug = null,
+            )
         } catch (error: Exception) {
-            mutable.value = mutable.value.copy(error = safe(error))
+            mutable.value = mutable.value.copy(preorderError = safe(error), preorderErrorSlug = slug, preorderMessage = null, preorderMessageSlug = null)
         } finally {
             mutable.value = mutable.value.copy(busy = false)
         }
