@@ -86,7 +86,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (response == null) {
             mutable.value = mutable.value.copy(
                 preorderLoading = false,
-                preorderLoadError = safe(outcome.exceptionOrNull() ?: IllegalStateException("Pre-registration could not be loaded.")),
+                preorderLoadError = safe(outcome.exceptionOrNull() as? Exception ?: IllegalStateException("Pre-registration could not be loaded.")),
             )
             return@launch
         }
