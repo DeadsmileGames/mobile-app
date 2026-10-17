@@ -20,6 +20,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,7 +69,24 @@ internal fun PreorderScreen(
             Spacer(Modifier.height(4.dp))
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(t("Atualizar inscrições")) }
         }
-        if (state.preorders.isEmpty()) {
+        if (state.preorderLoading) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
+        }
+        if (!state.preorderLoadError.isNullOrBlank()) {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(t(state.preorderLoadError), color = MaterialTheme.colorScheme.error)
+                        OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(t("Tentar novamente")) }
+                    }
+                }
+            }
+        }
+        if (state.preorders.isEmpty() && !state.preorderLoading && state.preorderLoadError.isNullOrBlank()) {
             item {
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -90,6 +109,12 @@ internal fun PreorderScreen(
                     }
                     Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(t("Inscrições abertas"))
+                    if (state.preorderErrorSlug == game.slug && !state.preorderError.isNullOrBlank()) {
+                        Text(t(state.preorderError), color = MaterialTheme.colorScheme.error)
+                    }
+                    if (state.preorderMessageSlug == game.slug && !state.preorderMessage.isNullOrBlank()) {
+                        Text(t(state.preorderMessage), color = MaterialTheme.colorScheme.primary)
+                    }
                     if (selectedSlug != game.slug) {
                         Button(onClick = {
                             selectedSlug = game.slug
@@ -113,17 +138,21 @@ internal fun PreorderScreen(
                         )
                         OutlinedTextField(
                             value = age, onValueChange = { value -> if (value.all(Char::isDigit)) age = value.take(3) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text(t("Idade")) }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("Idade")) }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                         OutlinedTextField(
                             value = email, onValueChange = { email = it.take(254) },
-                            modifier = Modifier.fillMaxWidth(), label = { Text(t("E-mail para confirmação")) }, singleLine = true
+                            modifier = Modifier.fillMaxWidth(), label = { Text(t("E-mail para confirmação")) }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                         )
                         Text(t("O e-mail será usado para confirmar a inscrição. Confira os dados antes de enviar."), style = MaterialTheme.typography.bodySmall)
                         Button(
                             onClick = { onRegister(game.slug, firstName, lastName, age, email) },
                             enabled = !state.busy && firstName.isNotBlank() && lastName.isNotBlank() &&
-                                age.toIntOrNull()?.let { it in 1..120 } == true && email.contains("@"),
+                                age.toIntOrNull()?.let { it in 1..120 } == true &&
+                                android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() &&
+                                state.preorderMessageSlug != game.slug,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
