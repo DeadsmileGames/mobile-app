@@ -92,7 +92,7 @@ class ApiClient(context: Context) {
         val tokenEndpoint = path == "/auth/mobile-token"
         val sessionEstablishing = path in setOf("/auth/mobile-login", "/auth/mobile-register", "/auth/verify-2fa")
         if (!tokenEndpoint && !sessionEstablishing) runCatching { refreshAccessTokenIfNeeded(false) }
-        val bearer = if (tokenEndpoint) null else prefs.getString("access_token", null)
+        val bearer = if (tokenEndpoint || sessionEstablishing) null else prefs.getString("access_token", null)
         return try {
             val result = try {
                 execute(method, path, body, csrfHeader, bearer)
