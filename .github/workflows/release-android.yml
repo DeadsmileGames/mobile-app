@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,16 +16,10 @@ concurrency:
 
 jobs:
   direct-apk:
-    if: github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.1'))
-    name: Build and publish direct-install APK
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.1'))
+    name: Build and verify signed direct-install APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    env:
-      ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-      ANDROID_RELEASE_KEYSTORE_PATH: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PATH }}
-      ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
-      ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-      ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -69,27 +64,40 @@ jobs:
           printf 'APP_VERSION_NAME=%s\n' "$VERSION" >> "$GITHUB_ENV"
           printf 'APP_VERSION_CODE=%s\n' "$VERSION_CODE" >> "$GITHUB_ENV"
 
-      - name: Prepare persistent release signing key
+      - name: Prepare and validate persistent release signing key
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -n "${ANDROID_RELEASE_KEYSTORE_BASE64:-}" ]]; then
-            printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/deadsmile-release.keystore"
-            test -s "$RUNNER_TEMP/deadsmile-release.keystore"
-            printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$RUNNER_TEMP/deadsmile-release.keystore" >> "$GITHUB_ENV"
-          elif [[ -n "${ANDROID_RELEASE_KEYSTORE_PATH:-}" && -f "$ANDROID_RELEASE_KEYSTORE_PATH" ]]; then
-            printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$ANDROID_RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
-          else
-            echo "::error::Configure ANDROID_RELEASE_KEYSTORE_BASE64 (recommended) or a valid ANDROID_RELEASE_KEYSTORE_PATH before publishing an Android release."
+          for name in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_RELEASE_STORE_PASSWORD ANDROID_RELEASE_KEY_ALIAS ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing GitHub Actions secret: $name. Configure the persistent Android release keystore before publishing."
+              exit 1
+            fi
+          done
+          KEYSTORE="$RUNNER_TEMP/deadsmile-release.keystore"
+          if ! printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE" || ! test -s "$KEYSTORE"; then
+            echo "::error::ANDROID_RELEASE_KEYSTORE_BASE64 is not a valid base64-encoded keystore."
             exit 1
           fi
-          test -n "${ANDROID_RELEASE_STORE_PASSWORD:-}"
-          test -n "${ANDROID_RELEASE_KEY_ALIAS:-}"
-          test -n "${ANDROID_RELEASE_KEY_PASSWORD:-}"
+          chmod 600 "$KEYSTORE"
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$ANDROID_RELEASE_STORE_PASSWORD" -alias "$ANDROID_RELEASE_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::The release keystore, store password, or key alias is invalid."
+            exit 1
+          fi
+          printf 'ANDROID_RELEASE_KEYSTORE_PATH=%s\n' "$KEYSTORE" >> "$GITHUB_ENV"
 
       - name: Run unit tests
         run: gradle --no-daemon --stacktrace testDirectDebugUnitTest testPlayDebugUnitTest
 
-      - name: Build direct-install APK
+      - name: Build and verify direct-install APK
+        env:
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           gradle --no-daemon --stacktrace assembleDirectRelease \
@@ -104,7 +112,14 @@ jobs:
           test -x "$APKSIGNER"
           test -x "$AAPT"
           "$APKSIGNER" verify --verbose "$APK"
-          "$APKSIGNER" verify --print-certs "$APK"
+          SIGNING_REPORT="$("$APKSIGNER" verify --print-certs "$APK")"
+          printf '%s\n' "$SIGNING_REPORT"
+          CERT_FINGERPRINT="$(printf '%s\n' "$SIGNING_REPORT" | sed -n 's/.*certificate SHA-256 digest: *//p' | head -n 1 | tr -d '[:space:]:' | tr '[:lower:]' '[:upper:]')"
+          if [[ ! "$CERT_FINGERPRINT" =~ ^[0-9A-F]{64}$ ]]; then
+            echo "::error::Could not extract the APK signing certificate SHA-256 fingerprint."
+            exit 1
+          fi
+          printf 'APK_SIGNING_CERT_SHA256=%s\n' "$CERT_FINGERPRINT" >> "$GITHUB_ENV"
 
           BADGING="$("$AAPT" dump badging "$APK")"
           printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
@@ -117,6 +132,7 @@ jobs:
           printf 'APK_ASSET=%s\n' "$RUNNER_TEMP/Deadsmile-Games-Android-v$APP_VERSION_NAME.apk" >> "$GITHUB_ENV"
 
       - name: Publish APK release
+        if: github.event_name != 'workflow_dispatch' && (github.ref_type == 'tag' || (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Android v1.1.1')))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -131,4 +147,8 @@ jobs:
             --title "Deadsmile Games $APP_VERSION_NAME" \
             --notes "APK for direct installation on Android.
 
-          Signed with the configured persistent Android release keystore, not a Google Play app-signing certificate. This is a direct-download APK, not a Google Play Store release. Android updates require the same signing certificate across releases; APKs previously signed with a different key may require uninstalling the older build first."
+          Signed with the configured persistent Android release keystore, not a Google Play app-signing certificate. This is a direct-download APK, not a Google Play Store release.
+          
+          Signing certificate SHA-256: $APK_SIGNING_CERT_SHA256
+          
+          Android only permits an in-place update when the signing certificate matches. Older builds signed with a different certificate must be uninstalled before installing this release; uninstalling may erase local app data."
