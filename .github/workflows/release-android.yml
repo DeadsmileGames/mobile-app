@@ -131,4 +131,4 @@ jobs:
             --title "Deadsmile Games $APP_VERSION_NAME" \
             --notes "APK for direct installation on Android.
 
-          Signed with the Android development key, not a Google Play app-signing certificate. This is a direct-download APK; it is not a Google Play Store release. Android updates require a matching signing certificate."
+          Signed with the configured persistent Android release keystore, not a Google Play app-signing certificate. This is a direct-download APK, not a Google Play Store release. Android updates require the same signing certificate across releases; APKs previously signed with a different key may require uninstalling the older build first."
