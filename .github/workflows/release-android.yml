@@ -98,6 +98,7 @@ jobs:
           ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
           ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
           gradle --no-daemon --stacktrace assembleDirectRelease \
@@ -120,6 +121,18 @@ jobs:
             exit 1
           fi
           printf 'APK_SIGNING_CERT_SHA256=%s\n' "$CERT_FINGERPRINT" >> "$GITHUB_ENV"
+          EXPECTED_CERT="$(printf '%s' "${ANDROID_RELEASE_CERT_SHA256:-}" | tr -d '[:space:]:' | tr '[:lower:]' '[:upper:]')"
+          if [[ -z "$EXPECTED_CERT" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::warning::Set the repository Actions variable ANDROID_RELEASE_CERT_SHA256 to $CERT_FINGERPRINT after reviewing this preflight."
+            else
+              echo "::error::Set repository Actions variable ANDROID_RELEASE_CERT_SHA256 to the approved release certificate SHA-256 before publishing."
+              exit 1
+            fi
+          elif [[ ! "$EXPECTED_CERT" =~ ^[0-9A-F]{64}$ || "$CERT_FINGERPRINT" != "$EXPECTED_CERT" ]]; then
+            echo "::error::APK signing certificate does not match ANDROID_RELEASE_CERT_SHA256. Refusing publication."
+            exit 1
+          fi
 
           BADGING="$("$AAPT" dump badging "$APK")"
           printf '%s\n' "$BADGING" | grep -F "package: name='com.deadsmilegames.companion' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'"
